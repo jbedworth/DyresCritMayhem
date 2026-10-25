@@ -1,0 +1,22 @@
+## Interface: 16001, 11509
+## Title: Dyre's Crit Mayhem
+## Notes: Dial up the mayhem on your crits: sounds, blood on the screen, themes, and your personal records
+## Author: Dyre
+## Version: 0.1.0
+## IconTexture: Interface\Icons\Ability_Rogue_Eviscerate
+## Category: Combat
+## Dependencies: DyresToolkit
+## OptionalDeps: DyresSounds
+## Group: DyresToolkit
+## SavedVariables: DyresCritMayhemAccountDB
+## SavedVariablesPerCharacter: DyresCritMayhemDB
+
+Commands.lua
+Core.lua
+Themes.lua
+Effects.lua
+Detect.lua
+Records.lua
+Window.lua
+Probe.lua
+Options.lua

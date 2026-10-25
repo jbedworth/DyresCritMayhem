@@ -1,0 +1,7 @@
+.tools/
+/dist/
+__pycache__/
+*.pyc
+luac.out
+# Sound license files: kept locally, not published.
+docs/licenses/
