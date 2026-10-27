@@ -25,7 +25,9 @@ RUNTIME_FILES = ("Commands.lua", "Core.lua", "Themes.lua", "Effects.lua", "Detec
 TEXT_FILES = (ADDON + ".toc",) + RUNTIME_FILES + ("LICENSE",)
 # Runtime textures shipped in the package: Brutal's splatters, Tame's butterflies,
 # stars, and sparkle, Spellburst's glows, and Fel's smoke, embers, cracks, and
-# vignette, original art built
+# vignette, the school looks' flame, ice shards, snowflake, pow, and leaves, and
+# Naturalist's claw rakes, bite, insect, vine, firework, and green-tinted vignette,
+# original art built
 # by scripts/build_splatters.py. The builder requires run-length encoded
 # 32-bit, square, power-of-two TGAs whose packets fill the image exactly.
 MEDIA_FILES = ("Textures/Splat1.tga", "Textures/Splat2.tga", "Textures/Splat3.tga", "Textures/Splat4.tga",
@@ -33,7 +35,11 @@ MEDIA_FILES = ("Textures/Splat1.tga", "Textures/Splat2.tga", "Textures/Splat3.tg
                "Textures/Butterfly2.tga", "Textures/Star1.tga", "Textures/Sparkle1.tga", "Textures/Heart1.tga",
                "Textures/Burst1.tga", "Textures/Burst2.tga", "Textures/Mote1.tga", "Textures/Ring1.tga",
                "Textures/Smoke1.tga", "Textures/Smoke2.tga", "Textures/Embers1.tga", "Textures/Crack1.tga",
-               "Textures/Vignette1.tga")
+               "Textures/Vignette1.tga", "Textures/Flame1.tga", "Textures/Shard1.tga",
+               "Textures/Snowflake1.tga", "Textures/Pow1.tga", "Textures/Rainbow1.tga",
+               "Textures/Maple1.tga", "Textures/Oak1.tga", "Textures/Birch1.tga", "Textures/Claw1.tga",
+               "Textures/Claw2.tga", "Textures/Claw3.tga", "Textures/Bite1.tga", "Textures/Insect1.tga", "Textures/Vine1.tga",
+               "Textures/Firework1.tga", "Textures/Vignette2.tga")
 PACKAGE_FILES = TEXT_FILES + MEDIA_FILES
 TGA_HEADER_SIZE = 18
 TGA_RLE_TRUECOLOR = 10
@@ -310,7 +316,8 @@ def _release_notes(version, changes):
 - Classic Era and Anniversary: everything, from the combat log. WoW: Forever
   (built for beta {GAME_VERSION}, build {TARGET_BUILD}, Interface {INTERFACE}):
   the combat log is closed to AddOns there, so crits come from combat text,
-  best solo, with records as best guesses while solo; unconfirmed until
+  on your target and nameplates (anyone's in a group), with records as best guesses
+  while solo; unconfirmed until
   Forever launches (`/dcm probe` checks it).
 - Never changes your game settings (violence level, volume, sound).
 - Settings in Options > AddOns > Dyre's AddOns, or `/dcm options`.

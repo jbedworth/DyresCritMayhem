@@ -164,7 +164,7 @@ local function StayTimes()
     return table.concat(times, ", ")
 end
 
--- "Brutal (18+)" and "Fel (18+)" while the box is clear.
+-- "Brutal (18+)", "Fel (18+)", and "Naturalist (18+)" while the box is clear.
 local function ThemeChoices()
     local container = Settings.CreateControlTextContainer()
     for _, theme in ipairs(DCM.Themes()) do
@@ -173,14 +173,14 @@ local function ThemeChoices()
     return container:GetData()
 end
 
--- The 18+ box that unlocks Brutal and Fel first (author: "Put the 'I'm 18+' check first"), then the theme.
+-- The 18+ box that unlocks Brutal, Fel, and Naturalist first (author: "Put the 'I'm 18+' check first"), then the theme.
 local function AddTheme()
     local adult = Proxy("DCM_ADULT", Settings.VarType.Boolean, "I'm 18 or over", false,
         function() return DCM.IsAdult() end,
         function(value) DCM.SetAdult(value == true) end)
     Settings.CreateCheckbox(category, adult,
-        "Unlocks the Brutal and Fel themes for every character on this account. Untick it to lock them "
-            .. "again: a character on either goes back to Tame.")
+        "Unlocks the Brutal, Fel, and Naturalist themes for every character on this account. Untick it to lock "
+            .. "them again: a character on one goes back to Tame.")
     local setting = Proxy(THEME_VARIABLE, Settings.VarType.String, "Theme", DCM.DEFAULT_THEME,
         function() return DCM.Theme().key end,
         function(value)
@@ -193,12 +193,33 @@ local function AddTheme()
             -- sounds in the Sounds rows.
             LaterRefresh()
         end)
-    Settings.CreateDropdown(category, setting, ThemeChoices,
+    local dropdown = Settings.CreateDropdown(category, setting, ThemeChoices,
         "What your crits look and sound like. Tame: butterflies, stars, and sparkles in soft pastels, with "
             .. "light shimmers. Brutal (18+): heavy flesh impacts, bone crunches, and blood splatter, dripping "
             .. "at High and Total Mayhem. Spellburst: bursts of light in your spell's school, for casters and "
             .. "healers; crit heals show too. Fel (18+): dark smoke, falling embers, and creeping cracks in fel "
-            .. "green, shadow, and hellfire. More themes are planned.")
+            .. "green, shadow, and hellfire. Naturalist (18+): savage claws and bites, wrathful green bursts with "
+            .. "insects and torn leaves, silver fireworks, and burning, frozen, and rotting leaves. More themes "
+            .. "are planned.")
+    -- Under the theme, live only for a theme that offers it (Tame): Blizzard
+    -- re-checks a child row whenever its parent's setting changes.
+    local random = Flag("DCM_RANDOM_EFFECTS", "Random Effects", "randomEffects",
+        "Tame only: ticked, every crit shows Tame's playful mix of stars, butterflies, and sparkles, whatever "
+            .. "its damage school. Clear (the default): a look for each school (a cartoon pow for melee, little "
+            .. "flames, snowflakes, leaves, puffs, violet stars, gold sparkles).")
+    if type(random.SetParentInitializer) == "function" then
+        random:SetParentInitializer(dropdown, function() return DCM.Theme().randomEffects == true end)
+    end
+    -- Naturalist's form check (author: "if the form check is doable, maybe
+    -- we keep it?"), off so its random mix stays the default.
+    local claws = Flag("DCM_CLAWS_IN_FORM", "Claws only in Cat or Bear form", "clawsInForm",
+        "Naturalist only: ticked, your melee crits show claw scratches and bites only in Cat, Bear, or Dire "
+            .. "Bear form (and a Hunter's pet's crits always do); in other forms, for other classes, and for "
+            .. "crits on you or others' crits, Brutal's blood splatter. Clear (the default): claws, bites, and "
+            .. "splatter mixed on every melee crit.")
+    if type(claws.SetParentInitializer) == "function" then
+        claws:SetParentInitializer(dropdown, function() return DCM.Theme().formClaws == true end)
+    end
 end
 
 -- The intensity (author: "leave the slider for 'Intensity'"), then how long
@@ -241,6 +262,14 @@ local function AddIntensity()
             .. "the middle of the screen for your own crits; at its edges for crits on you.")
 end
 
+local function OthersChoices()
+    local container = Settings.CreateControlTextContainer()
+    container:Add("off", "Off")
+    container:Add("target", "My target")
+    container:Add("nearby", "Nearby enemies (nameplates)")
+    return container:GetData()
+end
+
 local function AddCrits()
     Header("Which crits")
     Flag("DCM_MINE", "My crits", "mine", "Your own crits, melee, ranged, and spells.")
@@ -249,13 +278,16 @@ local function AddCrits()
         .. "the screen.")
     Flag("DCM_HEALS", "Heals too", "heals", "Crit heals play the sounds and show the theme's gentle heal "
         .. "effects, rising (no blood), and your heals get records too.")
-    -- Only where the combat log is closed to AddOns (WoW: Forever).
-    if DCM.RecordsGuessed() then
-        Flag("DCM_GROUP_GUESS", "Guess my crits in a group", "groupGuess",
-            "This client keeps the combat log from AddOns, so in a group DCM cannot tell whose crit it was. "
-                .. "Ticked, a crit on your target just after your own cast counts as yours: about one in three "
-                .. "will be someone else's. Solo, every crit is yours. Records are only kept solo.")
-    end
+    local others = Proxy("DCM_OTHERS", Settings.VarType.String, "Others' crits", DCM.DEFAULT_OTHERS_SCOPE,
+        function() return DCM.db.othersScope end,
+        function(value)
+            DCM.db.othersScope = DCM.OTHERS_SCOPES[value] and value or DCM.DEFAULT_OTHERS_SCOPE
+        end)
+    Settings.CreateDropdown(category, others, OthersChoices,
+        "Anyone's crits play the effects too: the mob is getting critted, whoever did it. Off: only yours. "
+            .. "My target: on the mob you target. Nearby enemies: on your target and every enemy with a "
+            .. "nameplate shown. Others' crits are trimmed first so a raid stays readable (one effect each, a "
+            .. "few per half second); yours always play. Never a record or a new record.")
 end
 
 local function HasSoundRows(library)

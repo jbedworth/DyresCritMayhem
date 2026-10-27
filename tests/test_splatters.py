@@ -43,8 +43,8 @@ class SplatterTests(unittest.TestCase):
     def test_nothing_touches_the_edge_and_each_has_enough_blood(self):
         size = splatters.SIZE
         for name, (kind, _) in splatters.TEXTURE_SPECS.items():
-            if kind == "vignette":
-                # It frames the screen, so it reaches its edges by design.
+            if kind in ("vignette", "lightvignette"):
+                # They frame the screen, so it reaches its edges by design.
                 continue
             _, _, data = splatters.decode(self.built[name])
             alphas = data[3::4]
@@ -93,6 +93,15 @@ class SplatterTests(unittest.TestCase):
         self.assertGreater(alpha(0, 0), 200)
         self.assertEqual({data[index] for index in range(0, len(data), 4) if data[index + 3]}, {0}, "black")
 
+    def test_the_rainbow_is_colored_with_a_rim_and_clear_below(self):
+        _, _, data = splatters.decode(self.built["Rainbow1.tga"])
+        size = splatters.SIZE
+        colors = {tuple(data[i:i + 3]) for i in range(0, len(data), 4) if data[i + 3] == 255}
+        self.assertGreater(len({(b, g, r) for b, g, r in colors if not (b == g == r)}), 6, "colored bands")
+        # The middle of its arc's foot is clear: an arc, not a disc.
+        middle = (size // 2 + 40) * size + size // 2
+        self.assertEqual(data[middle * 4 + 3], 0)
+
     def test_cute_textures_are_white_inside_with_a_darker_rim(self):
         names = splatters.cute_names()
         self.assertEqual(names, ["Butterfly1.tga", "Butterfly2.tga", "Star1.tga", "Sparkle1.tga", "Heart1.tga"])
@@ -112,7 +121,7 @@ class SplatterTests(unittest.TestCase):
     def test_themes_lua_names_every_texture(self):
         source = (ROOT / "Themes.lua").read_text(encoding="utf-8")
         for name in splatters.TEXTURE_SPECS:
-            self.assertIn('TEXTURES .. "' + name[:-4] + '"', source, name)
+            self.assertTrue('TEXTURES .. "' + name[:-4] + '"' in source or 'T("' + name[:-4] + '")' in source, name)
 
     def test_the_preview_is_a_png(self):
         for data in (splatters.preview(self.built),

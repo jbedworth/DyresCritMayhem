@@ -40,6 +40,15 @@ local CLEAR_MIDDLE = 0.22
 local EDGE_BAND = 0.14
 local PLACE_TRIES = 6
 local MAX_MOVING = 12
+-- Others' crits (kind "others": anyone's on your target or a nearby enemy)
+-- are trimmed first, so a raid pull cannot flood the screen: at most
+-- OTHERS_BURSTS (by intensity) in any OTHERS_WINDOW seconds, one still
+-- effect each (no drips, runs, rings, or loops), their sound under its own
+-- gap and never over yours, and never into the last OWN_RESERVE pool slots.
+-- Your crits and crits on you always go through.
+local OTHERS_WINDOW = 0.5
+local OTHERS_BURSTS = {low = 2, medium = 3, high = 4, max = 6}
+local OWN_RESERVE = 8
 -- /dcm test's schools in turn: fire, frost, arcane, shadow, nature, holy.
 local TEST_SCHOOLS = {4, 16, 64, 32, 8, 2}
 local SPIN_SECONDS = 6
@@ -62,6 +71,8 @@ DCM.random = math.random
 local overlay
 local free, active = {}, {}
 local lastSplat, lastSound = -math.huge, -math.huge
+local lastOthersSound = -math.huge
+local othersTimes = {}
 local moving = 0
 
 local function Now()
@@ -200,6 +211,13 @@ local function StartRun(splat, theme, color, size, hold, fade, x, y)
     run:SetTexture(theme.run)
     run:SetVertexColor(color[1], color[2], color[3])
     run:SetBlendMode("BLEND")
+    -- Always straight down the screen, whatever its splat's turn or mirror
+    -- (author: "the direction of the drips is always down"): the anchor is
+    -- the splat's center, which a turn does not move.
+    if type(run.SetRotation) == "function" then
+        run:SetRotation(0)
+    end
+    run:SetTexCoord(0, 1, 0, 1)
     run:SetSize(size * RUN_SIZE, size * RUN_SIZE)
     run:ClearAllPoints()
     if theme.runGrow == "center" then
@@ -248,21 +266,37 @@ end
 
 -- motion: "drip" (slides down, never turned), "float" (butterflies: rise,
 -- only tilted), or nil (a splatter, turned any way).
-local function ShowSplat(intensity, theme, texture, motion, big, taken, runs, color)
+-- opts (accents): at {x, y} (a spot instead of a random one), scale (of
+-- the size), slide {x, y} (instead of the motion's, any turn), blend, and
+-- layer (the ARTWORK sublevel: accents sit on top of the set). Returns the
+-- spot and size.
+local function ShowSplat(intensity, theme, texture, motion, big, taken, runs, color, still, opts)
+    opts = opts or {}
     local splat = TakeSplat()
     splat.group:Stop()
     local size = SPLAT_SIZE * intensity.size * (theme.size or 1) * (big and BIG_SIZE or 1)
-        * Between(1 - SIZE_JITTER, 1 + SIZE_JITTER)
-    color = color or theme.colors[DCM.random(#theme.colors)]
+        * Between(1 - SIZE_JITTER, 1 + SIZE_JITTER) * (opts.scale or 1)
+    -- A texture may have colors of its own (Brutal's scorch marks and rime).
+    local colors = theme.textureColors and theme.textureColors[texture] or theme.colors
+    color = theme.textureColors and theme.textureColors[texture] and colors[DCM.random(#colors)]
+        or color or colors[DCM.random(#colors)]
     splat:SetTexture(texture)
     -- Glows (Spellburst, Fel's embers) add light; the pooled texture is set
     -- every time.
-    splat:SetBlendMode(theme.textureBlend and theme.textureBlend[texture] or theme.blend or "BLEND")
-    splat:SetVertexColor(color[1], color[2], color[3])
+    splat:SetBlendMode(opts.blend or theme.textureBlend and theme.textureBlend[texture] or theme.blend or "BLEND")
+    splat:SetDrawLayer("ARTWORK", opts.layer or 0)
+    -- A pre-colored texture (Tame's rainbow) is drawn in its own colors.
+    if theme.untinted and theme.untinted[texture] then
+        splat:SetVertexColor(1, 1, 1)
+    else
+        splat:SetVertexColor(color[1], color[2], color[3])
+    end
     splat:SetSize(size, size)
     -- A random turn and mirror, so four textures never look like four.
     if type(splat.SetRotation) == "function" then
-        if motion == "float" then
+        if opts.slide then
+            splat:SetRotation(Between(0, 2 * math.pi))
+        elseif motion == "float" then
             splat:SetRotation(Between(-FLOAT_TILT, FLOAT_TILT))
         elseif motion == "drip" then
             splat:SetRotation(0)
@@ -275,7 +309,12 @@ local function ShowSplat(intensity, theme, texture, motion, big, taken, runs, co
     else
         splat:SetTexCoord(0, 1, 0, 1)
     end
-    local x, y = Spot(overlay:GetWidth(), overlay:GetHeight(), taken)
+    local x, y
+    if opts.at then
+        x, y = opts.at[1], opts.at[2]
+    else
+        x, y = Spot(overlay:GetWidth(), overlay:GetHeight(), taken)
+    end
     splat:ClearAllPoints()
     splat:SetPoint("CENTER", overlay, "BOTTOMLEFT", x, y)
     splat:SetAlpha(1)
@@ -284,7 +323,11 @@ local function ShowSplat(intensity, theme, texture, motion, big, taken, runs, co
     local hold, fadeSeconds = intensity.hold * stay, intensity.fade * stay
     splat.fade:SetStartDelay(hold)
     splat.fade:SetDuration(fadeSeconds)
-    splat.slide:SetOffset(0, motion == "drip" and -DRIP_SLIDE or motion == "float" and FLOAT_RISE or 0)
+    if opts.slide then
+        splat.slide:SetOffset(opts.slide[1], opts.slide[2])
+    else
+        splat.slide:SetOffset(0, motion == "drip" and -DRIP_SLIDE or motion == "float" and FLOAT_RISE or 0)
+    end
     splat.slide:SetDuration(hold + fadeSeconds)
     splat:Show()
     splat.group:Play()
@@ -293,14 +336,68 @@ local function ShowSplat(intensity, theme, texture, motion, big, taken, runs, co
     if runs and moving < MAX_MOVING and motion ~= "drip" and (motion == nil or theme.runGrow == "center") then
         StartRun(splat, theme, color, size, hold, fadeSeconds, x, y)
     end
+    if still then
+        return x, y, size
+    end
     local loop = theme.animations and theme.animations[texture]
     if loop and moving < MAX_MOVING then
         StartLoop(splat, loop)
     end
+    return x, y, size
 end
 
 local function Pick(list)
     return list[DCM.random(#list)]
+end
+
+-- Bumped by ClearEffects, so an accent's later part (Fel's ash) scheduled
+-- before a clear never shows.
+local generation = 0
+-- How far a blowing cluster drifts, in UIParent units.
+local DRIFT = 50
+
+-- A school's accent (Themes.lua `accent`): one or a few small, still effects
+-- of their own textures and colors. onTop: on the set's first splat; spread:
+-- scattered that far around it, drifting outward (drift "down" or "up");
+-- runs: a run grows from under it (Brutal's smear); loop: the theme's loop
+-- for it (a leaf's tumble); overlay: one more on the same spot (a flame
+-- lick); after: one more on the same spot once delay (of the hold) has
+-- passed, as the first starts to fade (ash).
+local function ShowAccent(intensity, theme, accent, taken, base)
+    local count = accent.count or 1
+    if type(count) == "table" then
+        count = count[1] + DCM.random(count[2] - count[1] + 1) - 1
+    end
+    for _ = 1, count do
+        local at, slide
+        if base and accent.onTop then
+            at = {base[1], base[2]}
+        elseif base and accent.spread then
+            local dx, dy = Between(-accent.spread, accent.spread), Between(-accent.spread, accent.spread)
+            at = {base[1] + dx, base[2] + dy}
+            local out = dx >= 0 and 1 or -1
+            slide = {out * Between(0.5, 1) * DRIFT, (accent.drift == "up" and 1 or -1) * DRIFT}
+        end
+        local x, y, size = ShowSplat(intensity, theme, Pick(accent.textures), accent.motion, false, taken,
+            accent.runs, Pick(accent.colors), not accent.loop,
+            {at = at, scale = accent.size, slide = slide, blend = accent.blend or "BLEND", layer = 2})
+        local extra = accent.overlay
+        if extra then
+            ShowSplat(intensity, theme, Pick(extra.textures), extra.motion, false, taken, false, Pick(extra.colors),
+                true, {at = {x, y}, scale = (extra.size or 1) * size / (SPLAT_SIZE * intensity.size
+                    * (theme.size or 1)), blend = extra.blend, layer = 3})
+        end
+        local later = accent.after
+        if later and type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+            local when = generation
+            C_Timer.After(intensity.hold * DCM.db.stay / 100 * (later.delay or 0.6), function()
+                if when == generation then
+                    ShowSplat(intensity, theme, Pick(later.textures), later.motion, false, taken, false,
+                        Pick(later.colors), true, {at = {x, y}, scale = later.size, blend = later.blend, layer = 3})
+                end
+            end)
+        end
+    end
 end
 
 -- crit: as PlayCrit's. A theme with school colors tints every effect of the
@@ -309,6 +406,13 @@ local function Splatter(theme, intensity, crit)
     local big, taken = crit.big, crit.kind == "taken"
     local color = theme.schoolColors and DCM.SchoolColor(theme, crit.school, crit.heal)
         or theme.schoolPalette and DCM.PaletteColor(theme, crit.school)
+    if crit.kind == "others" then
+        -- One still effect, and none when the pool is down to your reserve.
+        if #active < MAX_SPLATS - OWN_RESERVE then
+            ShowSplat(intensity, theme, Pick(theme.splats), theme.motion, false, false, false, color, true)
+        end
+        return
+    end
     local count = intensity.splats
     if Now() - lastSplat < BURST_GAP then
         count = 1
@@ -321,6 +425,7 @@ local function Splatter(theme, intensity, crit)
     local runChance = theme.run and theme.runChance and theme.runChance[intensity.key] or 0
     -- A ring closes the set for a new record, and from the theme's intensity.
     local ring = theme.ring and (big or DCM.ThemeFrom(theme.ringFrom, DCM.IntensityIndex()))
+    local base
     for index = 1, count do
         -- One effect in each set drips (Brutal) or rises (Spellburst's motes),
         -- where the theme has them at this intensity.
@@ -333,8 +438,40 @@ local function Splatter(theme, intensity, crit)
         if crit.heal then
             motion = "float"
         end
-        ShowSplat(intensity, theme, texture, motion, big, taken, not crit.heal and DCM.random() < runChance, color)
+        local x, y = ShowSplat(intensity, theme, texture, motion, big, taken,
+            not crit.heal and DCM.random() < runChance, color)
+        base = base or {x, y}
     end
+    if theme.accent and not crit.heal then
+        ShowAccent(intensity, theme, theme.accent, taken, base)
+    end
+end
+
+-- Others' crits: the theme's crit sound only, never within SOUND_GAP of any
+-- sound, and never holding up yours (yours keep their own gap).
+local function OthersSound()
+    if Now() - lastOthersSound < SOUND_GAP or Now() - lastSound < SOUND_GAP then
+        return
+    end
+    lastOthersSound = Now()
+    DCM.PlaySound(DCM.PickSound("crit"), "crit")
+end
+
+-- Whether another one of others' crits may play now (OTHERS_BURSTS per
+-- OTHERS_WINDOW at this intensity); counts it when it may.
+local function OthersAllowed(intensity)
+    local now, kept = Now(), {}
+    for _, at in ipairs(othersTimes) do
+        if now - at < OTHERS_WINDOW then
+            kept[#kept + 1] = at
+        end
+    end
+    othersTimes = kept
+    if #othersTimes >= (OTHERS_BURSTS[intensity.key] or 1) then
+        return false
+    end
+    othersTimes[#othersTimes + 1] = now
+    return true
 end
 
 local function Sound(theme, big, heal)
@@ -346,18 +483,23 @@ local function Sound(theme, big, heal)
         DCM.PlaySound(DCM.PickSound("big"), "big")
         return
     end
-    DCM.PlaySound(DCM.PickSound("crit"), "crit")
+    local crit = DCM.PickSound("crit")
+    DCM.PlaySound(crit, "crit")
     -- The extra (Brutal's squelch) goes with the effects on screen, from the
     -- theme's intensity, and then only now and then (author: "only play it,
     -- say 30% of the time"; the theme's extraChance, else EXTRA_CHANCE).
     if theme.sounds.extra and not heal and DCM.db.splatter
             and DCM.ThemeFrom(theme.sounds.extraFrom, DCM.IntensityIndex())
             and DCM.random() < (theme.sounds.extraChance or DCM.EXTRA_CHANCE) then
-        DCM.PlaySound(DCM.PickSound("extra"), "extra")
+        -- Never the crit's own sound twice (Fel's heartbeat).
+        local extra = DCM.PickSound("extra")
+        if extra ~= crit then
+            DCM.PlaySound(extra, "extra")
+        end
     end
 end
 
--- One crit. crit: {kind = "mine" | "pet" | "taken", big = a new record,
+-- One crit. crit: {kind = "mine" | "pet" | "taken" | "others", big = a new record,
 -- heal = a heal, school = its spell school mask, when known}. Which kinds
 -- count is Detect's call; this only plays it. Heals get the sound, and
 -- rising effects in the theme's heal style (or, in Spellburst, its own look).
@@ -367,12 +509,27 @@ function DCM.PlayCrit(crit)
         return
     end
     local theme = DCM.Theme()
+    -- What a damage crit draws: the theme's style for its school.
+    local style = DCM.CritStyle(theme, crit.school, crit)
+    if crit.kind == "others" then
+        if not OthersAllowed(intensity) then
+            return
+        end
+        if DCM.db.sound then
+            OthersSound()
+        end
+        if DCM.db.splatter then
+            Splatter(style, intensity, crit)
+        end
+        return
+    end
     if DCM.db.sound then
         Sound(theme, crit.big, crit.heal)
     end
     if DCM.db.splatter and (not crit.heal or theme.heals or theme.heal) then
-        -- A heal crit in a theme with a heal style draws that style.
-        Splatter(crit.heal and theme.heal or theme, intensity, crit)
+        -- A heal crit in a theme with a heal style draws that style; a
+        -- damage crit its school's style.
+        Splatter(crit.heal and (theme.heal or theme) or style, intensity, crit)
         if crit.big and theme.vignette and not crit.heal then
             DCM.PulseVignette(theme)
         end
@@ -397,6 +554,7 @@ end
 
 -- Clears the screen (the intensity went down, or the theme changed).
 function DCM.ClearEffects()
+    generation = generation + 1
     for index = #active, 1, -1 do
         local splat = active[index]
         splat.group:Stop()
@@ -408,7 +566,7 @@ function DCM.ClearEffects()
     end
 end
 
--- A dark frame around the screen for a new record (Fel): in quickly, then an
+-- A dark frame around the screen for a new record (Fel, Naturalist): in quickly, then an
 -- ominous slow fade, scaled by "Stays on screen". One texture, made once.
 local vignette
 
@@ -432,6 +590,9 @@ function DCM.PulseVignette(theme)
     end
     vignette.group:Stop()
     vignette:SetTexture(theme.vignette)
+    -- A tint for a white vignette (Naturalist's deep green); Fel's is black.
+    local tint = theme.vignetteColor or {1, 1, 1}
+    vignette:SetVertexColor(tint[1], tint[2], tint[3])
     vignette.fade:SetDuration(VIGNETTE_FADE * DCM.db.stay / 100)
     vignette:SetAlpha(1)
     vignette:Show()

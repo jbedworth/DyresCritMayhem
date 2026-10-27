@@ -74,6 +74,22 @@ DyresCritMayhem/
     Textures/Embers1.tga
     Textures/Crack1.tga
     Textures/Vignette1.tga
+    Textures/Flame1.tga
+    Textures/Shard1.tga
+    Textures/Snowflake1.tga
+    Textures/Pow1.tga
+    Textures/Rainbow1.tga
+    Textures/Maple1.tga
+    Textures/Oak1.tga
+    Textures/Birch1.tga
+    Textures/Claw1.tga
+    Textures/Claw2.tga
+    Textures/Claw3.tga
+    Textures/Bite1.tga
+    Textures/Insect1.tga
+    Textures/Vine1.tga
+    Textures/Firework1.tga
+    Textures/Vignette2.tga
 ```
 
 The validator permits one optional empty root directory entry. Additional files
@@ -83,7 +99,7 @@ agent guidance, generated logs, and all credentials/player data.
 
 Use an explicit file allowlist. Do not ZIP the checkout and maintain a growing
 list of exclusions. Keep `LICENSE` in the package, but do not load it in the TOC.
-DCM ships twenty-one textures in `Textures/`: Brutal's splatters, drips, and run, Spellburst's glows, Fel's smoke, embers, crack, and vignette (64 px), and Tame's
+DCM ships thirty-seven textures in `Textures/`: Brutal's splatters, drips, and run, Spellburst's glows, Fel's smoke, embers, crack, and vignette (64 px), the school looks' flame, ice shards, snowflake, pow, and maple, oak, and birch leaves, Naturalist's claw rakes, bite, insect, vine, firework, and white vignette (64 px, tinted green), and Tame's
 butterflies, star, sparkle, and heart, original art
 built by `scripts/build_splatters.py`. The builder requires each to be a
 run-length encoded 32-bit square TGA with power-of-two sides whose packets fill
@@ -248,8 +264,9 @@ Do not use a blind workflow rerun as a recovery procedure. See
 ## Release checklist
 
 - Release order: DCM's theme sounds (Dyre's Gore, Dyre's Smacks) are in Dyre's
-  Sounds 1.2.0; release that first, so the CurseForge app installs it with
-  DCM. With an older one DCM falls back to its other keys, then a chime.
+  Sounds 1.2.0, and Fel's (Dyre's Fel Sounds) in 1.4.0; release Dyre's Sounds
+  1.4.0 before DCM 0.2.0, so the CurseForge app installs it with DCM. With an
+  older one Fel uses its fallback pools, then other keys, then a chime.
 
 ### Client and package
 

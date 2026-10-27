@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.2.0
+
+### Features
+
+- Naturalist (18+), a new theme for Druids and nature, mature and a touch gory:
+  melee crits mix claw scratches (two to four), bites, and splatter, at
+  any angle, in blood that sometimes drips straight down (tick "Claws
+  only in Cat or Bear form", under the theme, to keep them to Cat and
+  Bear form and a Hunter's pet, with Brutal's splatter otherwise);
+  Wrath-like crits a murky green burst with
+  insects and torn leaves bursting out; arcane silver fireworks that fade;
+  fire charred, burning leaves and embers on a scorch; frost frozen leaves
+  with ice shards on frozen blood; holy a harsh searing flare; shadow
+  rotting black leaves on dark ichor. Crit heals sprout vines and green and
+  gold smoke, never flowers; a new record darkens the screen's edges in
+  deep green. Growls, a tiger, angry cats, and bear and lion roars.
+- Brutal in Cat or Bear form: your melee crits (and a Hunter's pet's)
+  are claw scratches, bites, and splatter in Brutal's red, dripping
+  straight down; out of form and for every other class, its blood
+  splatter as before.
+- Effects by damage school: every theme keeps its own look, and a crit's
+  school adds a color and a small touch. Brutal is always wounds: charred
+  blood with embers for fire, frozen blood with an ice shard for frost,
+  blood-soaked leaves stuck on the wound for nature, slowly smearing
+  down, black ichor, blood with a violet crackle, seared
+  wounds with a light flare. Fel is always its smoke and cracks, with
+  hellfire flame licks, rime, a leaf that catches fire and falls to ash,
+  violet, or pale light. Spellburst is always its bursts, colored by
+  school, with a flame or ice shard inside, and a puff of leaves blowing
+  up out of its green burst. Melee crits are blood in every theme but Tame (on Spellburst
+  only with the 18+ box, else a white flash). Tame has cartoon looks: a
+  pow, little flames, snowflakes, leaves, dusky puffs, twinkly stars, gold
+  sparkles, never blood. A spell of two schools shows one, magic first:
+  fire, frost, shadow, arcane, nature, holy.
+- Random Effects (Tame, off by default): tick it for Tame's playful mix of
+  stars, butterflies, and sparkles on every crit, whatever its school.
+- Leaves for nature: a Michigan maple, an oak, and a birch leaf. Tame's
+  nature crits are a tumble of them in autumn colors, maple most, with a
+  puff of leaves blowing out and drifting down; Spellburst's blow out and
+  up; Brutal's are soaked in blood and stick; Fel's burn to ash.
+- Tame has rainbows: a little cartoon rainbow joins its stars, butterflies,
+  and sparkles (and its holy crits), in its own colors.
+- Others' crits: anyone's crit on your target and on nearby enemies (with
+  a nameplate shown) now plays the effects and sounds too, in a group and
+  solo. Choose Off, My target, or Nearby enemies (the default). Others'
+  crits are trimmed so a raid stays readable (one effect each, a few per
+  half second); yours always play. Your records stay yours alone.
+
+### Other changes
+
+- Fel's own sounds (Dyre's Fel Sounds, Dyre's Sounds 1.4.0): a wet smash,
+  a mud splat, or a heartbeat on each crit, a deep demon growl for a new
+  record, and now and then a heartbeat from Medium. With an older Dyre's
+  Sounds, Fel keeps its earlier sounds. Needs Dyre's Sounds 1.4.0 for them.
+- "Guess my crits in a group" (WoW: Forever) is gone: in a group, a crit on
+  your target or an enemy nameplate plays as others' crits, and no records
+  are kept from it.
+
 ## 0.1.0
 
 ### Features

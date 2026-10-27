@@ -51,6 +51,8 @@ PREVIEW = ROOT / "artwork" / "splatters-preview.png"
 TAME_PREVIEW = ROOT / "artwork" / "tame-preview.png"
 SPELLBURST_PREVIEW = ROOT / "artwork" / "spellburst-preview.png"
 FEL_PREVIEW = ROOT / "artwork" / "fel-preview.png"
+NATURALIST_PREVIEW = ROOT / "artwork" / "naturalist-preview.png"
+SCHOOL_PREVIEW = ROOT / "artwork" / "school-textures-preview.png"
 MOTION_PREVIEW = ROOT / "artwork" / "motion-preview.png"
 # How deep in the pool, in pixels, the grey reaches its darkest.
 DEPTH = 22.0
@@ -93,6 +95,22 @@ TEXTURE_SPECS = {
     "Embers1.tga": ("embers", 61),
     "Crack1.tga": ("crack", 8),
     "Vignette1.tga": ("vignette", 0),
+    "Flame1.tga": ("flame", 33),
+    "Shard1.tga": ("shard", 52),
+    "Snowflake1.tga": ("snowflake", 0),
+    "Pow1.tga": ("pow", 21),
+    "Rainbow1.tga": ("rainbow", 0),
+    "Maple1.tga": ("maple", 0),
+    "Oak1.tga": ("oak", 0),
+    "Birch1.tga": ("birch", 0),
+    "Claw1.tga": ("claw", 5),
+    "Claw2.tga": ("claw", 4),
+    "Claw3.tga": ("claw", 6),
+    "Bite1.tga": ("bite", 27),
+    "Insect1.tga": ("insect", 0),
+    "Vine1.tga": ("vine", 14),
+    "Firework1.tga": ("firework", 31),
+    "Vignette2.tga": ("lightvignette", 0),
 }
 CUTE_KINDS = {"butterfly", "star", "sparkle", "heart"}
 # Spellburst's glows: soft-edged, white, drawn additively and tinted by spell
@@ -102,9 +120,26 @@ GLOW_KINDS = {"burst", "mote", "ring"}
 # texture that reaches its edges, since it frames the screen).
 SOFT_KINDS = GLOW_KINDS | {"smoke", "embers", "vignette"}
 FEL_KINDS = {"smoke", "embers", "crack", "vignette"}
+# Shared by the themes' school looks (fire, frost, nature, physical): a soft
+# flame, and white-with-a-rim ice shards, a leaf, a snowflake, and a cartoon
+# "pow" burst, tinted per theme.
+SCHOOL_KINDS = {"flame", "shard", "snowflake", "pow", "maple", "oak", "birch"}
+RIMMED_KINDS = CUTE_KINDS | {"shard", "snowflake", "pow", "maple", "oak", "birch"}
+SOFT_KINDS = SOFT_KINDS | {"flame"}
+# Naturalist's (a mature nature theme): claw rakes and a bite in the blood shading,
+# a beetle and a curling vine white with a rim, a silver firework spray (a
+# glow), and a white vignette tinted deep green in the client.
+NATURALIST_KINDS = {"claw", "bite", "insect", "vine", "firework", "lightvignette"}
+RIMMED_KINDS = RIMMED_KINDS | {"insect", "vine"}
+SOFT_KINDS = SOFT_KINDS | {"firework", "lightvignette"}
+# Drawn in its own colors, never tinted (the theme marks it untinted): Tame's
+# rainbow, pastel bands with a little cloud at each end.
+COLORED_KINDS = {"rainbow"}
+RAINBOW_BANDS = ((255, 150, 160), (255, 195, 140), (255, 235, 150), (170, 235, 160), (150, 200, 255),
+                 (195, 165, 255))
 # Textures smaller than SIZE: the vignette is a smooth gradient stretched over
 # the whole screen, so 64 pixels lose nothing and keep the file small.
-SIZES = {"Vignette1.tga": 64}
+SIZES = {"Vignette1.tga": 64, "Vignette2.tga": 64}
 
 
 def texture_size(name):
@@ -302,6 +337,155 @@ def star(seed):
     return shape
 
 
+def flame(seed):
+    """A flame: three soft tongues, brightest low in the middle."""
+    rng = random.Random(seed)
+    bottom = SIZE / 2 + 96
+    tongues = [(0.0, 190.0, 54.0)] + [(rng.choice((-1, 1)) * rng.uniform(18, 32), rng.uniform(110, 150),
+                                       rng.uniform(26, 36)) for _ in range(2)]
+
+    def light(dx, dy):
+        y = dy + SIZE / 2
+        alpha, core = 0.0, 0.0
+        for cx, height, width in tongues:
+            v = (bottom - y) / height
+            if v <= 0 or v >= 1:
+                continue
+            half = width * 2.2 * math.sqrt(v) * (1 - v) ** 1.2
+            off = abs(dx - cx * (0.3 + v))
+            alpha = max(alpha, _clamp((half - off) / 7))
+            if half > 0:
+                core = max(core, _clamp(1 - off / half) * (1 - v))
+        return 0.7 + 0.3 * core, alpha
+    return light
+
+
+def shard(seed):
+    """Ice shards: sharp splinters flying out from the middle, a few chips."""
+    rng = random.Random(seed)
+    shape = Shape()
+    c = SIZE / 2
+    for index in range(rng.randint(5, 7)):
+        angle = 2 * math.pi * index / 6 + rng.uniform(-0.3, 0.3)
+        length, width = rng.uniform(60, 105), rng.uniform(9, 16)
+        start = rng.uniform(4, 14)
+        tip = (c + math.cos(angle) * length, c + math.sin(angle) * length)
+        left = (c + math.cos(angle) * start + math.cos(angle + math.pi / 2) * width,
+                c + math.sin(angle) * start + math.sin(angle + math.pi / 2) * width)
+        right = (c + math.cos(angle) * start - math.cos(angle + math.pi / 2) * width,
+                 c + math.sin(angle) * start - math.sin(angle + math.pi / 2) * width)
+        shape.polygons.append([left, tip, right])
+    for _ in range(6):
+        angle, reach = rng.uniform(0, 2 * math.pi), rng.uniform(70, 110)
+        x, y, r = c + math.cos(angle) * reach, c + math.sin(angle) * reach, rng.uniform(4, 8)
+        shape.polygons.append([(x, y - r), (x + r * 0.7, y), (x, y + r), (x - r * 0.7, y)])
+    return shape
+
+
+def _leaf_parts(shape, top, foot):
+    """A leaf's stem below its foot and a darker midrib up its middle."""
+    vein = Shape()
+    c = SIZE / 2
+    shape.capsule(c, foot - 4, c + 3, foot + 24, 4, 3)
+    vein.capsule(c, top + 18, c, foot - 2, 2.2, 2.6)
+    shape.mid = vein
+
+
+def maple(seed):
+    """A sugar maple leaf (author: "I'm from MI, so Maple"): five pointed
+    lobes, each with two side teeth, deep notches between, and a stem."""
+    shape = Shape()
+    c, cy = SIZE / 2, SIZE / 2 + 6
+    # Lobes: angle from straight up (radians) and length.
+    lobes = [(-2.15, 74), (-1.08, 106), (0.0, 112), (1.08, 106), (2.15, 74)]
+    # Each lobe broad, with a tooth each side between its base and its tip.
+    shape_of_lobe = ((-0.42, 0.62), (-0.32, 0.78), (-0.24, 0.68), (-0.12, 0.9), (0.0, 1.0), (0.12, 0.9),
+                     (0.24, 0.68), (0.32, 0.78), (0.42, 0.62))
+    points = []
+    for index, (angle, length) in enumerate(lobes):
+        for offset, scale in shape_of_lobe:
+            points.append((angle + offset, length * scale))
+        if index < len(lobes) - 1:
+            points.append(((angle + lobes[index + 1][0]) / 2, 50))
+    # The base, either side of the stem.
+    points = [(-2.75, 34)] + points + [(2.75, 34)]
+    shape.polygons.append([(c + math.sin(a) * r, cy - math.cos(a) * r) for a, r in points])
+    vein = Shape()
+    shape.capsule(c, cy + 26, c + 4, cy + 72, 4, 3)
+    for angle, length in lobes:
+        vein.capsule(c, cy, c + math.sin(angle) * length * 0.8, cy - math.cos(angle) * length * 0.8, 2.2, 1.4)
+    shape.mid = vein
+    return shape
+
+
+def oak(seed):
+    """An oak leaf: long, with rounded lobes down both sides."""
+    shape = Shape()
+    c = SIZE / 2
+    points = []
+    for index in range(160):
+        t = 2 * math.pi * index / 160
+        y = -math.sin(t)
+        # Narrower toward the stem, rounded lobes along the sides.
+        width = 70 * (0.5 + 0.5 * (1 + y) / 2) * (0.6 + 0.4 * abs(math.cos(4.5 * math.asin(y))))
+        points.append((c + math.cos(t) * width, c - 6 - y * 92))
+    shape.polygons.append(points)
+    _leaf_parts(shape, c - 6 - 92, c - 6 + 92)
+    return shape
+
+
+def birch(seed):
+    """A birch or aspen leaf: a simple oval with a saw-toothed edge."""
+    shape = Shape()
+    c = SIZE / 2
+    points = []
+    teeth = 26
+    for index in range(teeth * 4):
+        t = 2 * math.pi * index / (teeth * 4)
+        saw = 1 + 0.06 * ((index % 4) / 3 - 0.5)
+        x, y = 62 * math.cos(t) * saw, 86 * math.sin(t) * saw
+        # A point at the tip: narrow the top half.
+        if y < 0:
+            x *= 1 - 0.35 * (-y / 86) ** 2
+        points.append((c + x, c - 10 + y))
+    shape.polygons.append(points)
+    _leaf_parts(shape, c - 10 - 86, c - 10 + 86)
+    return shape
+
+
+def snowflake(seed):
+    """A snowflake: six arms, each with two pairs of branches."""
+    shape = Shape()
+    c = SIZE / 2
+    for index in range(6):
+        angle = math.pi / 2 + index * math.pi / 3
+        ex, ey = c + math.cos(angle) * 100, c + math.sin(angle) * 100
+        shape.capsule(c, c, ex, ey, 7, 5)
+        for along, length in ((0.45, 30), (0.72, 20)):
+            bx, by = c + math.cos(angle) * 100 * along, c + math.sin(angle) * 100 * along
+            for side in (-1, 1):
+                branch = angle + side * math.pi / 3
+                shape.capsule(bx, by, bx + math.cos(branch) * length, by + math.sin(branch) * length, 5, 4)
+    shape.circle(c, c, 16)
+    return shape
+
+
+def pow(seed):
+    """A cartoon "pow": a jagged burst with uneven points."""
+    rng = random.Random(seed)
+    shape = Shape()
+    c = SIZE / 2
+    points = []
+    count = 13
+    for index in range(2 * count):
+        angle = math.pi * index / count + rng.uniform(-0.08, 0.08)
+        radius = rng.uniform(88, 112) if index % 2 == 0 else rng.uniform(48, 62)
+        points.append((c + math.cos(angle) * radius, c + math.sin(angle) * radius))
+    shape.polygons.append(points)
+    shape.rounding = 3
+    return shape
+
+
 def heart(seed):
     """A plump heart, for Tame's heal crits."""
     shape = Shape()
@@ -439,6 +623,165 @@ def vignette(seed):
     return light
 
 
+def lightvignette(seed):
+    """Vignette1's frame in white, for a theme that tints it (Naturalist's deep green)."""
+    dark = vignette(seed)
+
+    def light(dx, dy):
+        return 1.0, dark(dx, dy)[1]
+    return light
+
+
+def claw(seed):
+    """Claw rakes: two, three, or four (2 + seed % 3) roughly parallel gashes,
+    unevenly spaced, curved a little, each
+    swelling in the middle and tapering to a point at both ends, with a few
+    flecks thrown off."""
+    rng = random.Random(seed)
+    shape = Shape()
+    c = SIZE / 2
+    marks = 2 + seed % 3
+    angle = rng.uniform(-1.05, -0.75)
+    along, across = (math.cos(angle), math.sin(angle)), (-math.sin(angle), math.cos(angle))
+    bend = rng.uniform(10, 18)
+    gap = rng.uniform(22, 30)
+    for mark in range(marks):
+        offset = (mark - (marks - 1) / 2) * gap + rng.uniform(-5, 5)
+        length = rng.uniform(84, 100) * (0.85 if mark in (0, marks - 1) else 1)
+        shift = rng.uniform(-10, 10)
+        steps = 10
+        points = []
+        for step in range(steps + 1):
+            t = step / steps
+            u = (t - 0.5) * 2 * length + shift
+            v = offset + bend * (1 - (2 * t - 1) ** 2)
+            points.append((c + along[0] * u + across[0] * v, c + along[1] * u + across[1] * v,
+                           0.6 + 6.5 * math.sin(math.pi * t) ** 0.8))
+        for (ax, ay, ra), (bx, by, rb) in zip(points, points[1:]):
+            shape.capsule(ax, ay, bx, by, ra, rb)
+        for _ in range(rng.randint(2, 4)):
+            t = rng.uniform(0.25, 0.75)
+            x, y, _ = points[int(t * steps)]
+            shape.circle(x + rng.uniform(-14, 14), y + rng.uniform(4, 22), rng.uniform(1.4, 3.2))
+    return shape
+
+
+def bite(seed):
+    """A bite mark: an upper and a lower arc of punctures, the canines at
+    each end deeper, a few trickling a little."""
+    rng = random.Random(seed)
+    shape = Shape()
+    c = SIZE / 2
+    for jaw, (cy, sign) in enumerate(((c - 14, -1), (c + 14, 1))):
+        teeth = 7 if jaw == 0 else 6
+        for tooth in range(teeth):
+            t = tooth / (teeth - 1)
+            x = c + (t - 0.5) * 2 * 74
+            y = cy + sign * 34 * (1 - (2 * t - 1) ** 2) * -1 + sign * 6
+            canine = tooth in (1, teeth - 2)
+            rx, ry = (10, 14) if canine else (rng.uniform(6, 8), rng.uniform(7, 10))
+            shape.ellipse(x + rng.uniform(-2, 2), y + rng.uniform(-2, 2), rx, ry, rng.uniform(-0.3, 0.3))
+            if canine or rng.random() < 0.3:
+                length = rng.uniform(14, 34) if canine else rng.uniform(8, 16)
+                width = 3.6 if canine else 2.4
+                shape.capsule(x, y, x + rng.uniform(-2, 2), y + length, width, width * 0.7)
+                shape.circle(x, y + length + 1, width * 1.4)
+    return shape
+
+
+def insect(seed):
+    """A beetle seen from above: a round shell split down the middle, a head
+    with two feelers, and three bent legs a side."""
+    shape = Shape()
+    c = SIZE / 2
+    shape.ellipse(c, c + 16, 42, 58, 0)
+    shape.ellipse(c, c - 40, 26, 16, 0)
+    shape.circle(c, c - 60, 16)
+    for side in (-1, 1):
+        shape.capsule(c + side * 8, c - 72, c + side * 26, c - 104, 3, 2)
+        shape.capsule(c + side * 26, c - 104, c + side * 40, c - 112, 2, 1.6)
+        for leg, (y, out, foot) in enumerate(((c - 30, 58, -24), (c + 6, 66, 6), (c + 40, 60, 36))):
+            knee = (c + side * out, y + foot * 0.4)
+            shape.capsule(c + side * 30, y, knee[0], knee[1], 4.5, 3.5)
+            shape.capsule(knee[0], knee[1], knee[0] + side * 14, y + foot + 14, 3.5, 2)
+    dark = Shape()
+    dark.capsule(c, c - 36, c, c + 70, 2.2, 1.6)
+    dark.ellipse(c, c - 60, 9, 7, 0)
+    shape.dark = dark
+    return shape
+
+
+def vine(seed):
+    """A vine sprouting up: a stem swaying up from the bottom, curling into a
+    spiral at the top, with small leaves along it and a tendril."""
+    rng = random.Random(seed)
+    shape = Shape()
+    c = SIZE / 2
+    points = []
+    for step in range(15):
+        t = step / 14
+        points.append((c + 18 * math.sin(t * 2.6 + 0.4), SIZE - 14 - t * 150, 7.5 - 3 * t))
+    # The curl: a shrinking spiral from the stem's top.
+    x, y, r = points[-1]
+    turns = 22
+    for step in range(1, turns + 1):
+        t = step / turns
+        angle = math.pi + t * 1.7 * math.pi
+        radius = 38 * (1 - 0.65 * t)
+        points.append((x + 38 + math.cos(angle) * radius, y - math.sin(angle) * radius * 0.9, 4.5 - 2.5 * t))
+    for (ax, ay, ra), (bx, by, rb) in zip(points, points[1:]):
+        shape.capsule(ax, ay, bx, by, ra, rb)
+    mid = Shape()
+    for index, side in ((3, -1), (6, 1), (9, -1), (12, 1)):
+        px, py, _ = points[index]
+        angle = side * 0.9 - 0.3 * side
+        lx, ly = px + side * 22, py - 10
+        shape.ellipse(lx, ly, 20, 9, -angle)
+        mid.capsule(px, py, lx + side * 12, ly - 4, 1.4, 1)
+    # A tendril off the stem.
+    tx, ty, _ = points[7]
+    for step in range(8):
+        a0, a1 = step * 0.7, (step + 1) * 0.7
+        r0, r1 = 16 - step * 1.6, 16 - (step + 1) * 1.6
+        shape.capsule(tx - 18 - math.cos(a0) * r0, ty - math.sin(a0) * r0,
+                      tx - 18 - math.cos(a1) * r1, ty - math.sin(a1) * r1, 2, 1.6)
+    shape.mid = mid
+    rng.random()
+    return shape
+
+
+def firework(seed):
+    """A firework spray: many thin streaks out from the middle, each ending in
+    a bright spark, a few sparks falling short; white, drawn additively."""
+    rng = random.Random(seed)
+    streaks = []
+    count = 26
+    for index in range(count):
+        angle = 2 * math.pi * (index + rng.uniform(-0.3, 0.3)) / count
+        streaks.append((math.cos(angle), math.sin(angle), rng.uniform(72, SIZE / 2 - 14)))
+    sparks = [(cos * length, sin * length, 5.0) for cos, sin, length in streaks]
+    for _ in range(18):
+        angle, reach = rng.uniform(0, 2 * math.pi), rng.uniform(30, 90)
+        sparks.append((math.cos(angle) * reach, math.sin(angle) * reach, 3.0))
+
+    def light(dx, dy):
+        r = math.hypot(dx, dy)
+        best = 0.0
+        if r > 1:
+            ux, uy = dx / r, dy / r
+            for cos, sin, length in streaks:
+                if r > length or ux * cos + uy * sin < 0.9:
+                    continue
+                off = abs(dx * sin - dy * cos)
+                best = max(best, math.exp(-(off / 1.4) ** 2) * (0.25 + 0.75 * r / length))
+        for sx, sy, size in sparks:
+            if abs(dx - sx) < size * 3 and abs(dy - sy) < size * 3:
+                best = max(best, math.exp(-((dx - sx) ** 2 + (dy - sy) ** 2) / size ** 2))
+        best = max(best, 0.6 * math.exp(-(r / 14) ** 2))
+        return 1.0, _clamp(best)
+    return light
+
+
 def crack(seed):
     """Creeping cracks: jagged lines branching out from the middle."""
     rng = random.Random(seed)
@@ -465,9 +808,11 @@ def crack(seed):
 
 
 BUILDERS = {"splat": splat, "drip": drip, "run": run, "butterfly": butterfly, "star": star, "sparkle": sparkle,
-            "heart": heart,
+            "heart": heart, "flame": flame, "shard": shard, "snowflake": snowflake, "pow": pow, "maple": maple,
+            "oak": oak, "birch": birch,
             "burst": burst, "mote": mote, "ring": ring, "smoke": smoke, "embers": embers, "vignette": vignette,
-            "crack": crack}
+            "crack": crack, "claw": claw, "bite": bite, "insect": insect, "vine": vine, "firework": firework,
+            "lightvignette": lightvignette}
 
 
 def glow_pixels(kind, seed, size=SIZE):
@@ -487,13 +832,51 @@ def glow_pixels(kind, seed, size=SIZE):
     return bytes(out)
 
 
+def rainbow_pixels():
+    """A cartoon rainbow: six pastel bands in an arc, a cloud at each end,
+    each with the same darker rim as Tame's other art."""
+    c, base = SIZE / 2, SIZE / 2 + 34
+    outer, inner = 104.0, 56.0
+    band = (outer - inner) / len(RAINBOW_BANDS)
+    clouds = Shape()
+    for side in (-1, 1):
+        x = c + side * (outer + inner) / 2
+        for dx, dy, r in ((0, 6, 20), (side * -16, 12, 15), (side * 16, 12, 15), (0, 20, 14)):
+            clouds.circle(x + dx, base + dy, r)
+    out = bytearray()
+    for y in range(SIZE):
+        for x in range(SIZE):
+            px, py = x + 0.5, y + 0.5
+            r = math.hypot(px - c, py - base)
+            arc = max(r - outer, inner - r)
+            if py > base:
+                arc = max(arc, py - base)
+            cloud = clouds.distance(px, py)
+            d = min(arc, cloud)
+            alpha = max(0.0, min(1.0, 0.5 - d))
+            if alpha == 0:
+                out += b"\x00\x00\x00\x00"
+                continue
+            rim = RIM_GREY + (1 - RIM_GREY) * max(0.0, min(1.0, -d / RIM))
+            if cloud <= arc:
+                color = (255, 255, 255)
+            else:
+                index = min(len(RAINBOW_BANDS) - 1, max(0, int((outer - r) / band)))
+                color = RAINBOW_BANDS[index]
+            red, green, blue = (round(channel * rim) for channel in color)
+            out += bytes((blue, green, red, round(alpha * 255)))
+    return bytes(out)
+
+
 def pixels(name):
     """BGRA bytes, top row first."""
     kind, seed = TEXTURE_SPECS[name]
+    if kind in COLORED_KINDS:
+        return rainbow_pixels()
     if kind in SOFT_KINDS:
         return glow_pixels(kind, seed, texture_size(name))
     shape = BUILDERS[kind](seed)
-    cute = kind in CUTE_KINDS
+    cute = kind in RIMMED_KINDS
     rounding = getattr(shape, "rounding", 0)
     out = bytearray()
     for y in range(SIZE):
@@ -586,11 +969,20 @@ def cute_names():
 
 
 def splat_names():
-    return [name for name, (kind, _) in TEXTURE_SPECS.items() if kind not in CUTE_KINDS | GLOW_KINDS | FEL_KINDS]
+    return [name for name, (kind, _) in TEXTURE_SPECS.items()
+            if kind not in CUTE_KINDS | GLOW_KINDS | FEL_KINDS | SCHOOL_KINDS | NATURALIST_KINDS]
+
+
+def school_names():
+    return [name for name, (kind, _) in TEXTURE_SPECS.items() if kind in SCHOOL_KINDS]
 
 
 def fel_names():
     return [name for name, (kind, _) in TEXTURE_SPECS.items() if kind in FEL_KINDS]
+
+
+def naturalist_names():
+    return [name for name, (kind, _) in TEXTURE_SPECS.items() if kind in NATURALIST_KINDS]
 
 
 def glow_names():
@@ -620,9 +1012,9 @@ def preview(textures, names=None, tints=None):
                     if not a:
                         continue
                     alpha = a / 255
-                    shade = r / 255
-                    for channel in range(3):
-                        tinted = shade * tints[column][channel] * 255
+                    # Per channel, so a colored texture (the rainbow) shows its own colors.
+                    for channel, value in enumerate((r, g, b)):
+                        tinted = value / 255 * tints[column][channel] * 255
                         row[(ox + x) * 3 + channel] = round(tinted * alpha + background[channel] * (1 - alpha))
     return png(width, height, [bytes(row) for row in canvas])
 
@@ -707,12 +1099,23 @@ def main():
         PREVIEW.parent.mkdir(parents=True, exist_ok=True)
         PREVIEW.write_bytes(preview(textures))
         names = cute_names()
-        TAME_PREVIEW.write_bytes(preview(textures, names, [PASTELS[i % len(PASTELS)] for i in range(len(names))]))
+        tints = [PASTELS[i % len(PASTELS)] for i in range(len(names))]
+        names.append("Rainbow1.tga")
+        tints.append((1, 1, 1))
+        TAME_PREVIEW.write_bytes(preview(textures, names, tints))
         MOTION_PREVIEW.write_bytes(motion_preview(textures))
         names = glow_names()
         SPELLBURST_PREVIEW.write_bytes(preview(textures, names, [SCHOOLS[i % len(SCHOOLS)] for i in range(len(names))]))
         names = fel_names()
         FEL_PREVIEW.write_bytes(preview(textures, names, [FEL[i % len(FEL)] for i in range(len(names))]))
+        names = naturalist_names()
+        naturalist = {"claw": BRUTAL, "bite": BRUTAL, "insect": (0.3, 0.32, 0.12), "vine": (0.45, 0.75, 0.3),
+                "firework": (0.85, 0.88, 0.95), "lightvignette": (0.05, 0.25, 0.05)}
+        NATURALIST_PREVIEW.write_bytes(preview(textures, names, [naturalist[TEXTURE_SPECS[name][0]] for name in names]))
+        names = school_names()
+        tints = ((1, 0.5, 0.12), (0.55, 0.85, 1), (0.8, 0.92, 1), (1, 0.85, 0.3), (1, 0.6, 0.55), (1, 0.75, 0.45),
+                 (0.65, 0.92, 0.55))
+        SCHOOL_PREVIEW.write_bytes(preview(textures, names, [tints[i % len(tints)] for i in range(len(names))]))
 
 
 if __name__ == "__main__":

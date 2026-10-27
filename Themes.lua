@@ -22,7 +22,8 @@ local addonName, DCM = ...
 --   that intensity; blend "ADD" for glows; schoolColors: tint by spell school
 --   (DCM.SchoolColor) instead of colors; schoolPalette: a few colors for
 --   some schools, else colors (DCM.PaletteColor); textureBlend: a blend per
---   texture; runGrow "center": the run spreads from the splat's spot;
+--   texture; untinted: textures drawn in their own colors (a rainbow);
+--   runGrow "center": the run spreads from the splat's spot;
 --   vignette: a dark frame around the screen for a new record;
 --   heals: crit heals show too, rising, in the theme's own look (Spellburst);
 --   heal: a heal style instead (author: every theme gets a heal-crit visual,
@@ -38,7 +39,8 @@ local addonName, DCM = ...
 --   with the effects on screen, from that
 --   intensity). DCM.PickSound picks one at random, never the same twice in
 --   a row; the player's own pick per event (the Sounds section) wins. The
---   library plays it, and DCM ships no sound.
+--   library plays it, and DCM ships no sound. fallback: pools per event for
+--   an older Dyre's Sounds without the theme's keys (Fel's).
 local TEXTURES = "Interface\\AddOns\\" .. addonName .. "\\Textures\\"
 local SOUNDS_MISSING = "The crit sounds come from Dyre's Sounds: install it from CurseForge to hear them."
 -- The events a theme has sounds for, in the Sounds section's order.
@@ -97,11 +99,20 @@ DCM.RegisterTheme({
     key = "tame",
     name = "Tame",
     description = "Butterflies, stars, and sparkles in soft pastels, with light shimmers.",
-    splats = {TEXTURES .. "Butterfly1", TEXTURES .. "Butterfly2", TEXTURES .. "Star1", TEXTURES .. "Sparkle1"},
+    -- A rainbow among them (author: "I intended it as a texture to add to
+    -- Tame to vary what shows up"), drawn in its own colors.
+    splats = {TEXTURES .. "Butterfly1", TEXTURES .. "Butterfly2", TEXTURES .. "Star1", TEXTURES .. "Sparkle1",
+        TEXTURES .. "Rainbow1"},
+    untinted = {[TEXTURES .. "Rainbow1"] = true},
     -- Pink, lavender, mint, butter.
     colors = {{1, 0.72, 0.84}, {0.8, 0.72, 1}, {0.68, 0.95, 0.82}, {1, 0.93, 0.62}},
     size = 0.6,
     motion = "float",
+    -- The "Random Effects" setting (author: "make it a setting I can toggle
+    -- if the Tame theme is selected"): ticked, every damage school draws the
+    -- stars, butterflies, and sparkles above; clear (the default), Tame's
+    -- look for each school.
+    randomEffects = true,
     -- Heal crits: hearts (beating), a sparkle, or a butterfly, in pink and gold.
     heal = {
         splats = {TEXTURES .. "Heart1", TEXTURES .. "Heart1", TEXTURES .. "Sparkle1", TEXTURES .. "Butterfly1"},
@@ -128,13 +139,13 @@ DCM.RegisterTheme({
 
 -- Spell-school tints (school masks: 1 physical, 2 holy, 4 fire, 8 nature,
 -- 16 frost, 32 shadow, 64 arcane), in the order a mixed school (Frostfire)
--- is read; shadow is purple, since black adds no light. An unknown or secret
--- school: arcane white.
+-- is read, the same as DCM.SchoolKind's; shadow is purple, since black adds
+-- no light. An unknown or secret school: arcane white.
 local SCHOOL_COLORS = {
     {mask = 4, color = {1, 0.5, 0.12}},
     {mask = 16, color = {0.45, 0.8, 1}},
-    {mask = 64, color = {0.9, 0.45, 1}},
     {mask = 32, color = {0.6, 0.3, 0.95}},
+    {mask = 64, color = {0.9, 0.45, 1}},
     {mask = 8, color = {0.4, 1, 0.4}},
     {mask = 2, color = {1, 0.92, 0.6}},
     {mask = 1, color = {1, 1, 1}},
@@ -287,17 +298,342 @@ DCM.RegisterTheme({
         [TEXTURES .. "Smoke1"] = "spin",
         [TEXTURES .. "Smoke2"] = "spin",
     },
-    -- Placeholders, the darkest of Dyre's Sounds' own, until the author's
-    -- demonic, decay, or hellfire sounds join it: swap them here. Its files
-    -- (Dyre's Gore, Aggression, Bears) play everywhere; the game's kit
-    -- sounds only where Playable.
+    -- Dyre's Fel Sounds (Dyre's Sounds 1.4.0; author: "Here are some 'Fel
+    -- Sounds' for that theme"), files, so they play on Classic Era: a wet
+    -- smash, a mud splat, or a heartbeat per crit, the demon growl for a
+    -- record, and a heartbeat as the extra (skipped when the crit's own
+    -- sound was the heartbeat). fallback: the earlier pools, for an older
+    -- Dyre's Sounds without them (the game's kit sounds only where
+    -- Playable).
     sounds = {
-        crit = {"gorebash", "gorechop", "impactslowthud", "impactsstrangeclang", "instrumentssynthbuzz"},
-        big = {"bigmonsterroar", "monsterbear"},
-        extra = {"orcfury", "instrumentspitchpipedistressed"},
+        crit = {"felwetsmash", "felmudsplat", "felheartbeat"},
+        big = {"feldemongrowl"},
+        extra = {"felheartbeat"},
+        extraFrom = "medium",
+        fallback = {
+            crit = {"gorebash", "gorechop", "impactslowthud", "impactsstrangeclang", "instrumentssynthbuzz"},
+            big = {"bigmonsterroar", "monsterbear"},
+            extra = {"orcfury", "instrumentspitchpipedistressed"},
+        },
+    },
+})
+
+-- Naturalist, for Druids and nature (author: "let's make it more mature and a
+-- touch gory, not whimsical"; author: "Naturalist is the theme name"): 18+
+-- like Brutal and Fel. Its own look is savage, for every physical crit
+-- (author: "random splatter or claw/bite marks is fine for the theme"):
+-- claw rakes of two, three, or four scratches, a bite mark, and Brutal's
+-- splatter, mixed in every set (author: "make sure it mixes up the base effect (bite,
+-- scratches, splatter) ... the bite and scratch direction (and number of
+-- scratches) should be random; not uniform"), each turned any way, mirrored
+-- at random, and sized a little differently like every splat; some grow a
+-- run, always straight down the screen (StartRun). Its "Claws only in Cat or
+-- Bear form" box (`clawsInForm`, off by default; `formClaws` marks the theme
+-- that offers it) keeps the claws to a beast's crits (DCM.FeralCrit), Brutal's
+-- splatter otherwise. The schools (below) bring a
+-- murky green burst with insects and torn leaves, silver fireworks, and
+-- darker, graphic leaves. Heal crits: vines sprouting and green and gold
+-- smoke rising, never flowers. A new record: Fel's vignette, deep green.
+-- Original textures (scripts/build_splatters.py).
+DCM.RegisterTheme({
+    key = "naturalist",
+    name = "Naturalist",
+    description = "Savage claws and bites, wrathful green bursts, and torn, burning, and rotting leaves.",
+    mature = true,
+    splats = {TEXTURES .. "Claw1", TEXTURES .. "Claw2", TEXTURES .. "Claw3", TEXTURES .. "Bite1",
+        TEXTURES .. "Splat1", TEXTURES .. "Splat3"},
+    colors = {{0.6, 0.02, 0.02}, {0.48, 0.02, 0.02}},
+    size = 1,
+    drips = {TEXTURES .. "Drip1", TEXTURES .. "Drip2"},
+    dripsFrom = "high",
+    -- Some marks drip at random (author: "3-4 claw scratches that randomly
+    -- drip blood"), a little more often than Brutal's.
+    run = TEXTURES .. "Run1",
+    runChance = {low = 0.3, medium = 0.4, high = 0.5, max = 0.65},
+    formClaws = true,
+    vignette = TEXTURES .. "Vignette2",
+    vignetteColor = {0.04, 0.22, 0.04},
+    -- Heal crits (author: "no flowers, sprouting vines are fine and/or
+    -- green/gold rising smoke"): a vine, or a wisp of green or gold smoke.
+    heal = {
+        splats = {TEXTURES .. "Vine1", TEXTURES .. "Vine1", TEXTURES .. "Smoke1", TEXTURES .. "Smoke2"},
+        colors = {{0.4, 0.75, 0.3}, {0.85, 0.72, 0.3}},
+        textureBlend = {[TEXTURES .. "Smoke1"] = "ADD", [TEXTURES .. "Smoke2"] = "ADD"},
+        size = 0.8,
+        animations = {
+            [TEXTURES .. "Smoke1"] = "spin",
+            [TEXTURES .. "Smoke2"] = "spin",
+        },
+    },
+    -- Dyre's Cats and Bears, and Dyre's Gore: files, so they play on Classic
+    -- Era.
+    sounds = {
+        crit = {"angrycat", "tigerroar", "goreslice"},
+        big = {"bearroar", "monsterbear", "lionroar"},
+        extra = {"wetsplat"},
         extraFrom = "medium",
     },
 })
+
+-- Effects by damage school (author: "Physical vs. magic, and each school of
+-- magic ... has it's own effect for each theme, with some shared if
+-- needed"; then, after play: each theme keeps its own language, and the
+-- school adds a tint and an accent, with gore for physical in every theme
+-- but Tame). A theme's
+-- styles[kind] is a style (a small theme of its own: splats, colors,
+-- textureColors, blend, textureBlend, animations, motion, size, drips, run,
+-- ring, accent) that reads whatever it does not set from a base theme (Restyle), so
+-- styles share; or a function returning one (Spellburst's physical, by the
+-- 18+ box). A kind with no style, or an unknown or secret school, draws the
+-- theme's own look. Heals keep the theme's heal style; sounds stay the
+-- theme's.
+DCM.SCHOOL_KINDS = {"physical", "holy", "fire", "nature", "frost", "shadow", "arcane"}
+-- A mask with several schools is one kind (author: "no combo, pick one for
+-- each"): any magic before physical, in this order.
+local KIND_ORDER = {
+    {kind = "fire", mask = 4},
+    {kind = "frost", mask = 16},
+    {kind = "shadow", mask = 32},
+    {kind = "arcane", mask = 64},
+    {kind = "nature", mask = 8},
+    {kind = "holy", mask = 2},
+    {kind = "physical", mask = 1},
+}
+
+function DCM.SchoolKind(school)
+    if type(school) ~= "number" or DCM.IsSecret(school) or school <= 0 then
+        return nil
+    end
+    for _, entry in ipairs(KIND_ORDER) do
+        if HasSchool(school, entry.mask) then
+            return entry.kind
+        end
+    end
+end
+
+-- A beast's crit (claws and bites in Brutal, and in Naturalist with its box):
+-- yours in Cat, Bear, or Dire
+-- Bear form (Detect.lua's form cache), or a Hunter's pet's (Hunter pets are
+-- beasts; a Warlock's demon is not). Others' crits and crits on you: never.
+function DCM.FeralCrit(crit)
+    if not crit then
+        return false
+    end
+    if crit.kind == "mine" then
+        return DCM.feralForm == true
+    end
+    return crit.kind == "pet" and DCM.beastPet == true
+end
+
+-- The style a crit of this school draws in this theme, and its kind. A theme
+-- that offers Random Effects (Tame), with the setting ticked, draws its own
+-- look for every school. crit (optional) is DCM.PlayCrit's: a style may
+-- depend on whose crit it is (Naturalist's claws).
+function DCM.CritStyle(theme, school, crit)
+    local kind = DCM.SchoolKind(school)
+    if theme.randomEffects and DCM.db and DCM.db.randomEffects then
+        return theme, kind
+    end
+    local style = kind and theme.styles and theme.styles[kind]
+    if type(style) == "function" then
+        style = style(theme, crit)
+    end
+    return style or theme, kind
+end
+
+local function Restyle(base, fields)
+    return setmetatable(fields, {__index = base})
+end
+
+local FIRE, FLAME = {1, 0.5, 0.12}, {1, 0.8, 0.3}
+local ICE, RIME = {0.55, 0.85, 1}, {0.85, 0.95, 1}
+local ARCANE, HOLY_LIGHT = {0.85, 0.45, 1}, {1, 0.92, 0.6}
+local function T(name)
+    return TEXTURES .. name
+end
+-- The leaves: maple three times as often as oak or birch.
+local LEAVES = {T("Maple1"), T("Maple1"), T("Maple1"), T("Oak1"), T("Birch1")}
+local LEAF_TUMBLE = {[T("Maple1")] = "spin", [T("Oak1")] = "spin", [T("Birch1")] = "spin"}
+
+do
+    local tame, brutal, spellburst, fel, naturalist = themes.tame, themes.brutal, themes.spellburst, themes.fel,
+        themes.naturalist
+    -- Tame: never gore. A cartoon pow, little flames, snowflakes, leaves,
+    -- small dusky puffs, twinkly stars, gold sparkles.
+    tame.styles = {
+        physical = Restyle(tame, {splats = {T("Pow1"), T("Pow1"), T("Star1")},
+            colors = {{1, 0.9, 0.45}, {1, 0.75, 0.6}}, animations = {[T("Pow1")] = "twinkle", [T("Star1")] = "spin"}}),
+        fire = Restyle(tame, {splats = {T("Flame1"), T("Flame1"), T("Sparkle1")},
+            colors = {{1, 0.7, 0.45}, {1, 0.85, 0.5}}, textureBlend = {[T("Flame1")] = "ADD"},
+            animations = {[T("Flame1")] = "twinkle", [T("Sparkle1")] = "twinkle"}}),
+        frost = Restyle(tame, {splats = {T("Snowflake1")}, colors = {{0.75, 0.9, 1}, {0.9, 0.95, 1}},
+            animations = {[T("Snowflake1")] = "spin"}}),
+        -- Leaves (author: "I'm from MI, so Maple might be better"): maple
+        -- most, oak, birch, in autumn pastels, tumbling as they rise.
+        nature = Restyle(tame, {splats = LEAVES, colors = {{1, 0.6, 0.55}, {1, 0.75, 0.45}, {1, 0.88, 0.45},
+            {0.65, 0.92, 0.55}}, animations = LEAF_TUMBLE}),
+        shadow = Restyle(tame, {splats = {T("Smoke1"), T("Smoke2")}, colors = {{0.6, 0.55, 0.75}, {0.5, 0.48, 0.62}},
+            size = 0.45, animations = {}}),
+        arcane = Restyle(tame, {splats = {T("Star1"), T("Sparkle1")}, colors = {{0.85, 0.7, 1}, {0.75, 0.65, 1}}}),
+        holy = Restyle(tame, {splats = {T("Sparkle1"), T("Sparkle1"), T("Star1"), T("Rainbow1")},
+            colors = {{1, 0.88, 0.45}, {1, 0.95, 0.7}}}),
+    }
+    -- Each theme keeps its own language; the school adds a tint and at most
+    -- one small accent (author: "Go with 1, keeping the physical-gore
+    -- exception in all non-Tame themes"). An accent (`accent`, drawn by
+    -- Effects.lua's ShowAccent) is a few small effects of its own: textures,
+    -- colors, blend, size, motion, count, and optionally onTop (on the set's
+    -- first splat), spread and drift (a blowing cluster), runs (a run grows
+    -- from under it), loop (the theme's loop, a tumble), overlay (one more on
+    -- the same spot), and after (one more there once the first starts to
+    -- fade).
+    local function Accent(texture, colors, blend, motion)
+        return {textures = {T(texture)}, colors = colors, blend = blend, motion = motion}
+    end
+    -- Nature's leaves, per theme (author: "For brutal, it should look like
+    -- the leaves are wet with blood and splatter on the screen and stick,
+    -- maybe slowly smear down. For Tame, and Spellburst, bursts/puffs of
+    -- blowing/falling is fine. Fel, make them burn and fall to ash").
+    local BLOODY_LEAVES = {textures = {T("Maple1"), T("Maple1"), T("Oak1"), T("Birch1")},
+        colors = {{0.5, 0.12, 0.06}, {0.42, 0.24, 0.08}}, size = 0.55, onTop = true, runs = true}
+    local function BlowingLeaves(colors, drift)
+        return {textures = LEAVES, colors = colors, count = {3, 5}, size = 0.35, spread = 40, drift = drift,
+            loop = true}
+    end
+    local BURNING_LEAF = {textures = LEAVES, colors = {HELLFIRE, FEL_GREEN}, size = 0.5,
+        overlay = {textures = {T("Flame1")}, colors = {HELLFIRE, FEL_GREEN}, blend = "ADD", size = 0.7,
+            motion = "float"},
+        after = {textures = {T("Embers1")}, colors = {{0.45, 0.42, 0.4}}, size = 0.5, motion = "drip",
+            delay = 0.6}}
+    -- Brutal: always gore and wounds. Fire charred blood with embers; frost
+    -- frozen blood with an ice shard; nature blood-soaked leaves stuck on
+    -- the splat, smearing down; shadow black ichor with a wisp of smoke;
+    -- arcane blood with a violet crackle; holy seared wounds with a light
+    -- flare.
+    local function Wound(colors, accent)
+        return Restyle(brutal, {colors = colors, accent = accent})
+    end
+    brutal.styles = {
+        fire = Wound({{0.32, 0.06, 0.02}, {0.45, 0.09, 0.02}}, Accent("Embers1", {FIRE, FLAME}, "ADD", "float")),
+        frost = Wound({{0.42, 0.12, 0.25}, {0.33, 0.16, 0.36}}, Accent("Shard1", {ICE, RIME})),
+        nature = Wound({{0.62, 0.02, 0.02}}, BLOODY_LEAVES),
+        shadow = Wound({{0.08, 0.02, 0.08}, {0.14, 0.03, 0.12}}, Accent("Smoke2", {SHADOW})),
+        arcane = Wound({{0.62, 0.02, 0.02}}, Accent("Crack1", {ARCANE}, "ADD")),
+        holy = Wound({{0.45, 0.12, 0.05}}, Accent("Burst1", {HOLY_LIGHT}, "ADD")),
+    }
+    -- A beast's physical crit, shared by Brutal (always) and Naturalist (its
+    -- "Claws only in Cat or Bear form" box): claw rakes, a bite, and
+    -- splatter mixed, in the base theme's colors and run chances (author:
+    -- "Add the form check to the Brutal theme and use claw/bite/splat there
+    -- too, because, why not").
+    local CLAW_MIX = {T("Claw1"), T("Claw2"), T("Claw3"), T("Bite1"), T("Splat1"), T("Splat3")}
+    local function Beast(base)
+        return Restyle(base, {splats = CLAW_MIX})
+    end
+    local brutalBeast = Beast(brutal)
+    brutal.beast = brutalBeast
+    brutal.styles.physical = function(_, crit)
+        if DCM.FeralCrit(crit) then
+            return brutalBeast
+        end
+        return brutal
+    end
+    -- Tame's nature: its rising leaves, and a puff of leaves blowing out and
+    -- drifting down.
+    tame.styles.nature.accent = BlowingLeaves(tame.styles.nature.colors, "down")
+    -- Spellburst: always its bursts, motes, and rings tinted by school, with
+    -- a flame or ice shard among them for fire and frost, and for nature a
+    -- green burst with a puff of leaves blowing out and up. Physical is
+    -- Brutal's gore with the 18+ box (author: "if I'm a wizard and start
+    -- hitting a mob with my stick and get a crit, I should probably see some
+    -- blood"), else a white impact flash, still in its own language: never
+    -- gore without the box.
+    local flash = Restyle(spellburst, {splats = {T("Burst1"), T("Ring1")}, colors = {{1, 1, 1}},
+        schoolColors = false})
+    spellburst.styles = {
+        physical = function()
+            if DCM.IsAdult() then
+                return brutal
+            end
+            return flash
+        end,
+        fire = Restyle(spellburst, {splats = {T("Burst1"), T("Flame1")}}),
+        frost = Restyle(spellburst, {splats = {T("Burst2"), T("Shard1")}}),
+        nature = Restyle(spellburst, {splats = {T("Burst1")},
+            animations = {[T("Burst1")] = "spin", [T("Maple1")] = "spin", [T("Oak1")] = "spin",
+                [T("Birch1")] = "spin"},
+            accent = BlowingLeaves({{0.55, 1, 0.45}, {0.8, 1, 0.5}}, "up")}),
+    }
+    -- Fel: always its demonic smoke, cracks, and embers; the school picks
+    -- the tint and an accent. Fire hellfire with flame licks; frost icy
+    -- smoke and cracks with rime; nature rot with a leaf that catches fire
+    -- and falls to ash; shadow its purple-black; arcane violet; holy pale.
+    -- Physical is Brutal's gore (Fel is 18+ too). Never a sparkle.
+    local function Dark(colors, fields)
+        fields = fields or {}
+        fields.colors, fields.schoolPalette = colors, false
+        return Restyle(fel, fields)
+    end
+    fel.styles = {
+        physical = brutal,
+        fire = Dark({HELLFIRE, FEL_GREEN}, {accent = Accent("Flame1", {HELLFIRE, FEL_GREEN}, "ADD", "float")}),
+        frost = Dark({{0.5, 0.65, 0.8}, {0.35, 0.45, 0.6}}, {accent = Accent("Shard1", {RIME})}),
+        nature = Dark({{0.35, 0.4, 0.1}, {0.28, 0.32, 0.08}},
+            {runChance = {low = 0.4, medium = 0.5, high = 0.6, max = 0.7}, accent = BURNING_LEAF}),
+        shadow = Dark({SHADOW}),
+        arcane = Dark({{0.55, 0.2, 0.75}}),
+        holy = Dark({{0.85, 0.8, 0.6}}),
+    }
+    -- Naturalist: physical its own claws and bite. The magic schools, "graphic
+    -- and darker" (author): nature "Green 'wrath-like' bursts with insects
+    -- and leaf debris 'poofing' out", murky (drawn, not added light) and
+    -- without a twinkle; arcane "Random Silver bursts (firework-like) that
+    -- fade"; fire charred, burning leaves and embers on a scorched splat;
+    -- frost frozen, blood-flecked leaves with shards on frozen blood; holy
+    -- a harsh searing flare on a scorch; shadow rotting black leaves on
+    -- dark ichor, smearing. No runs for the bursts, fireworks, or scorches.
+    local WOUNDS = {T("Splat1"), T("Splat2"), T("Splat3"), T("Splat4")}
+    local NO_RUNS = {low = 0, medium = 0, high = 0, max = 0}
+    local function Feral(fields)
+        return Restyle(naturalist, fields)
+    end
+    -- Its own mix is the beast's (Beast(naturalist) would be the same);
+    -- with the box ticked, anything but a beast's crit is Brutal's
+    -- splatter, drips, and runs.
+    naturalist.beast = naturalist
+    naturalist.styles = {
+        physical = function(_, crit)
+            if DCM.db and DCM.db.clawsInForm and not DCM.FeralCrit(crit) then
+                return brutal
+            end
+            return naturalist
+        end,
+        nature = Feral({splats = {T("Burst1"), T("Burst2")}, colors = {{0.16, 0.38, 0.08}, {0.24, 0.45, 0.1}},
+            drips = false, runChance = NO_RUNS, animations = {[T("Burst1")] = "spin"},
+            accent = {textures = {T("Insect1"), T("Insect1"), T("Maple1"), T("Oak1"), T("Birch1")},
+                colors = {{0.2, 0.22, 0.08}, {0.3, 0.26, 0.1}, {0.18, 0.3, 0.06}}, count = {4, 6}, size = 0.3,
+                spread = 45, drift = "down", loop = true}}),
+        arcane = Feral({splats = {T("Firework1")}, colors = {{0.85, 0.88, 0.95}, {0.72, 0.76, 0.85}},
+            blend = "ADD", drips = false, runChance = NO_RUNS, animations = {}}),
+        fire = Feral({splats = WOUNDS, colors = {{0.22, 0.05, 0.02}, {0.32, 0.07, 0.02}}, runChance = NO_RUNS,
+            accent = {textures = LEAVES, colors = {{0.16, 0.07, 0.03}, {0.26, 0.09, 0.03}}, count = {1, 2},
+                size = 0.45, onTop = true,
+                overlay = {textures = {T("Flame1")}, colors = {FIRE, FLAME}, blend = "ADD", size = 0.7,
+                    motion = "float"},
+                after = {textures = {T("Embers1")}, colors = {FIRE, FLAME}, blend = "ADD", size = 0.6,
+                    motion = "float", delay = 0.5}}}),
+        frost = Feral({splats = WOUNDS, colors = {{0.42, 0.12, 0.25}, {0.33, 0.16, 0.36}},
+            accent = {textures = LEAVES, colors = {RIME, {0.72, 0.8, 0.9}, {0.85, 0.7, 0.75}}, count = {1, 2},
+                size = 0.5, onTop = true, overlay = {textures = {T("Shard1")}, colors = {ICE}, size = 0.55}}}),
+        holy = Feral({splats = WOUNDS, colors = {{0.3, 0.12, 0.04}}, runChance = NO_RUNS,
+            accent = {textures = {T("Burst1")}, colors = {HOLY_LIGHT, {1, 1, 0.85}}, blend = "ADD", size = 1.1,
+                onTop = true, overlay = {textures = {T("Ring1")}, colors = {{1, 0.95, 0.75}}, blend = "ADD",
+                    size = 1}}}),
+        shadow = Feral({splats = WOUNDS, colors = {{0.08, 0.02, 0.08}, {0.12, 0.04, 0.1}},
+            accent = {textures = LEAVES, colors = {{0.06, 0.05, 0.04}, {0.12, 0.1, 0.06}}, count = {1, 2},
+                size = 0.55, onTop = true, runs = true}}),
+    }
+end
 
 -- Dyre's Sounds, contract 1, else nil.
 local function Library()
@@ -328,6 +664,17 @@ local function Pool(theme, event)
     return theme.sounds[event] or {}
 end
 
+-- The keys of a list this Dyre's Sounds has and plays here.
+local function Playable(library, list)
+    local pool = {}
+    for _, key in ipairs(list or {}) do
+        if Installed(library, key) then
+            pool[#pool + 1] = key
+        end
+    end
+    return pool
+end
+
 local lastPicks = {}
 
 -- The sound for an event: the player's own pick, else one of the theme's
@@ -340,11 +687,10 @@ function DCM.PickSound(event)
         return own.key
     end
     local library, theme = Library(), DCM.Theme()
-    local pool = {}
-    for _, key in ipairs(Pool(theme, event)) do
-        if Installed(library, key) then
-            pool[#pool + 1] = key
-        end
+    local pool = Playable(library, Pool(theme, event))
+    -- An older Dyre's Sounds without the theme's keys: its fallback pool.
+    if #pool == 0 and theme.sounds.fallback then
+        pool = Playable(library, theme.sounds.fallback[event])
     end
     if #pool == 0 then
         for _, other in ipairs(DCM.SOUND_EVENTS) do

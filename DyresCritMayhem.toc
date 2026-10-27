@@ -2,7 +2,7 @@
 ## Title: Dyre's Crit Mayhem
 ## Notes: Dial up the mayhem on your crits: sounds, blood on the screen, themes, and your personal records
 ## Author: Dyre
-## Version: 0.1.0
+## Version: 0.2.0
 ## IconTexture: Interface\Icons\Ability_Rogue_Eviscerate
 ## Category: Combat
 ## Dependencies: DyresToolkit

@@ -67,12 +67,15 @@ local FLAGS = {
     pet = false,        -- your pet's crits
     taken = false,      -- crits that hit you
     heals = false,      -- crit heals too (effects and records)
-    groupGuess = false, -- without the combat log: guess your crits in a group
+    randomEffects = false, -- Tame: its playful mix for every damage school
+    clawsInForm = false, -- Naturalist: claws and bites only in Cat or Bear form
     announceParty = false,
     announceGuild = false,
     announceScreen = false,
 }
 DCM.FLAGS = FLAGS
+DCM.OTHERS_SCOPES = {off = true, target = true, nearby = true}
+DCM.DEFAULT_OTHERS_SCOPE = "nearby"
 DCM.SORT_KEYS = {name = true, hit = true, crit = true}
 DCM.available = false
 
@@ -187,6 +190,16 @@ function DCM.SanitizeDB(db)
         db.theme = DCM.DEFAULT_THEME
     end
     db.stay = DCM.SanitizeStay(db.stay)
+    -- Others' crits (effects only, never records): off, on your target, or
+    -- on your target and nearby enemies (the default). 0.1.0's "Guess my
+    -- crits in a group" and a test build's on/off switch are replaced.
+    if db.others == false and db.othersScope == nil then
+        db.othersScope = "off"
+    end
+    if not DCM.OTHERS_SCOPES[db.othersScope] then
+        db.othersScope = DCM.DEFAULT_OTHERS_SCOPE
+    end
+    db.others, db.groupGuess = nil, nil
     -- The player's own sound per event: on (it wins over the theme's pool)
     -- and its key, kept across theme changes.
     local picks = type(db.soundPicks) == "table" and db.soundPicks or {}

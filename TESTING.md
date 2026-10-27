@@ -42,7 +42,7 @@ Install Dyre's Toolkit, Dyre's Sounds, and DCM. Turn off other crit AddOns
 (CritsBloodyCrits, LightsaberCrit, RainingBlood) so their effects don't mix
 in, and BugSack on to catch errors.
 
-1. **Login**: `DCM: Dyre's Crit Mayhem 0.1.0 by Dyre` and the ready line; no
+1. **Login**: `DCM: Dyre's Crit Mayhem 0.2.0 by Dyre` and the ready line; no
    errors. `/dcm debug` says `detection=combatlog combatLogRestricted=false
    theme=tame intensity=off adult=false stay=100`.
 2. **Off**: fight something. No sound, nothing on screen. `/dcm` lists your
@@ -105,9 +105,45 @@ in, and BugSack on to catch errors.
      creep out under the smoke where it landed and fade with it.
    - A new record: the screen's edges darken and fade slowly (longer with
      "Stays on screen" up).
-   - Placeholder sounds on Era: Gore: Bash or Gore: Chop per crit, Big
-     monster roar or Monster bear for a record, Orc spitting fury from
-     Medium. None silent.
+   - Sounds on Era (Dyre's Sounds 1.4.0): Fel Sounds' Wet smash, Mud
+     splat, or Heartbeat per crit; Demon growl for a record; from Medium a
+     Heartbeat now and then after a smash or splat, never two heartbeats
+     at once. None silent. With Dyre's Sounds 1.3.0: Gore: Bash or Chop,
+     Big monster roar or Monster bear, Orc spitting fury.
+6a. **Naturalist** (a Druid; full client restart: seven new textures):
+   - With "I'm 18 or over" clear, the dropdown reads "Naturalist (18+)" and
+     choosing it says it is for 18 and over. Tick the box: Naturalist works.
+     Clear it: back to Tame, with a line. A new character starts on Tame.
+   - Cat or Bear form (Claw, Rake, Maul, Swipe, white swings): a mix of
+     claw scratches (two, three, or four lines), bite marks, and blood
+     splatter, each at its own angle and size, never all alike; now and
+     then one grows a trickle that runs straight down the screen, however
+     the mark is turned. From High a dripping one too.
+   - "Claws only in Cat or Bear form" sits under the Theme, greyed except
+     on Naturalist, clear by default. Clear: caster form with a mace, and
+     a Warrior on Naturalist, still mix claws, bites, and splatter.
+   - Tick it: out of form (caster form with a mace or staff, Moonkin,
+     Travel, Aquatic), a Warrior, crits on you, and others' crits are
+     Brutal's blood splatter only, with its drips and runs. Shift back to
+     Cat: claws again on the next crit. A Hunter's pet ("Pet's crits" on)
+     claws and bites; a Warlock's demon splatters.
+   - Brutal (no box): a Druid in Cat or Bear form gets claws, bites, and
+     splatter in Brutal's red; in caster form, and a Warrior, Brutal's
+     splatter as before. A Hunter's pet claws. Spells look as before.
+   - Wrath: a murky dark-green burst (no glow, no twinkle) with 4 to 6
+     beetles and dark leaf bits blowing out and falling, tumbling.
+   - Moonfire (arcane on Era): silver firework sprays at random spots,
+     fading. No stars.
+   - Fire (a fire-damage weapon or proc): a scorched splat with a charred
+     leaf burning on it, then embers rising. Frost: pale frozen leaves
+     with an ice shard on frozen blood. Holy: a harsh flare and ring on a
+     scorch. Shadow: black leaves on dark ichor with a smear.
+   - "Heals too", a crit Healing Touch or Rejuvenation tick: vines and
+     green or gold smoke rising, never flowers or hearts.
+   - A new record: the screen's edges go deep green and fade slowly.
+   - Sounds on Era: Angry cat, Tiger growl, or Gore: Slice per crit; Bear
+     roar, Monster bear, or Lion roar for a record; Wet splat hit from
+     Medium on about 3 crits in 10. None silent.
 7. **Sounds section**: tick "Crit: my own sound", choose Dyre's Blades:
    Laser sword swing (it plays once); crits now always play it, also after
    switching theme. "Reset sounds to theme": the theme's random ones again.
@@ -121,23 +157,58 @@ in, and BugSack on to catch errors.
    beat), a sparkle, or a butterfly rising; Brutal warm red and gold
    droplets of light rising, no blood; Fel glowing green wisps rising;
    Spellburst gold light. Damage crits look as before.
-8. **Records**: beat an ability's record: chat says `New record! <ability>
+8. **By damage school** (full client restart: five new textures):
+   - A Mage on Spellburst meleeing with a staff: a crit shows a white flash
+     (a burst and a ring) without the 18+ box, blood with it. Fireball an
+     orange burst with a flame; Frostbolt a blue burst with an ice shard;
+     Arcane Missiles violet bursts. Every spell still looks like Spellburst.
+   - A Warrior on Brutal with a fire-damage enchant or proc (Fiery Weapon,
+     a fire-damage weapon): its crit is still a wound, charred dark with a
+     few rising embers; melee crits red blood as before. On Tame: little
+     flames, and a pow for melee.
+   - A Warlock on Fel: Shadow Bolt purple-black smoke; Immolate or Searing
+     Pain hellfire smoke with a flame lick; Frostbolt-like frost icy smoke
+     with a shard; melee or the pet Brutal's red blood; no sparkles.
+   - Each theme is recognisable at a glance whatever the school.
+   - Nature crits (a Druid's Wrath or Moonfire, or `/dcm test`): Tame a
+     puff of 3 to 5 small tumbling leaves blowing out and down; Spellburst
+     a green burst with the puff blowing out and up; Brutal one or two
+     dark, blood-soaked leaves stuck on the red splat with a smear running
+     down; Fel a leaf in hellfire or fel green with a flame on it, then
+     grey ash falling from it as it fades. Never acid green on Brutal.
+   - A spell of two schools (Frostfire, Shadowflame) shows its first:
+     fire.
+   - On Tame, now and then a little rainbow (in its own colors) floats up
+     among the stars and butterflies, and with holy crits.
+   - On Tame, "Random Effects" sits under the theme; tick it and every crit
+     shows stars, butterflies, and sparkles again; clear it, the school
+     looks. Choose Brutal: the row greys at once; back to Tame: live.
+9. **Others' crits** (Era, in a group, nameplates on): stand back while a
+   groupmate fights.
+   - Nearby enemies (the default): their crits on your target and on any
+     enemy with a nameplate shown play one effect each and a sound; nothing
+     new appears in `/dcm`. A mob without a nameplate plays nothing.
+   - My target: only their crits on your target.
+   - Off: nothing of theirs.
+   - Pull a big pack at Total Mayhem: their effects stay a trickle (a few
+     per half second), and your own crits still play in full.
+10. **Records**: beat an ability's record: chat says `New record! <ability>
    crit <n> (was <m>)`, and the crit sounds bigger. Show new records on
    screen: the pop shows and fades. `/dcm unlock`: a sample pop to drag and
    size ("Record pop size"); `/dcm lock`; `/dcm reset`.
-9. **Announcements**: in a party, Announce in party sends one line; a
+11. **Announcements**: in a party, Announce in party sends one line; a
    second record within 10 seconds is not sent. Guild the same.
-10. **Window**: `/dcm`. The panel is dark enough to read over the world.
+12. **Window**: `/dcm`. The panel is dark enough to read over the world.
    With a few records there is no scroll bar and the crit column sits fully
    inside the right edge; with more than 15 the scroll bar shows and every
    column ends left of it. The headings line up over their numbers, and the
    white heading is the sort the hint below names. Click each heading twice
    (both directions). Escape closes it. Options opens the page. Reset records in combat refuses; out
    of combat it asks, and Yes clears.
-11. **Game settings untouched**: violence level, master and effects volume,
+13. **Game settings untouched**: violence level, master and effects volume,
    and sound effects are what they were before.
-12. **Anniversary**: repeat 1, 2, 4, and 8.
-13. **Forever, launch day** (about 5 minutes; Brutal or Tame at Medium):
+14. **Anniversary**: repeat 1, 2, 4, and 10.
+15. **Forever, launch day** (about 5 minutes; Brutal or Tame at Medium):
     1. `/dcm debug`: `detection=unitcombat combatLogRestricted=true`, and no
        blocked-action error since login.
     2. `/dcm probe`, then solo: target a mob and fight it with your spells and
@@ -153,8 +224,8 @@ in, and BugSack on to catch errors.
          `detailAmount` (a largest hit, or totals)?
     3. Did crits play effects, and does `/dcm` show records (the hint says
        "Solo guesses from combat text")? Do they match your combat text?
-    4. Group with someone: with "Guess my crits in a group" off nothing plays
-       on their crits; ticked, your crits on your target play, and some of
-       theirs.
+    4. Group with someone: with Nearby enemies their crits on your target
+       and on enemy nameplates play, with no record; My target only the
+       target; Off nothing.
     5. `/reload`, then send `WTF/Account/<account>/<realm>/<character>/
        SavedVariables/DyresCritMayhem.lua` (its `probe.lines`).

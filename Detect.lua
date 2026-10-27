@@ -4,8 +4,13 @@ local _, DCM = ...
 --
 -- The combat log (Classic Era 1.15.9, Anniversary 2.5.6): COMBAT_LOG_EVENT_UNFILTERED
 -- with C_CombatLog.GetCurrentEventInfo (CombatLogGetCurrentEventInfo is only
--- a deprecation fallback there). Damage and heals from you or your pet, and
--- damage to you. Fields after the 11 common ones:
+-- a deprecation fallback there). Damage and heals from you or your pet,
+-- damage to you, and anyone's damage crits on your target or, by default,
+-- any nearby enemy with a nameplate shown (author: "The mob I'm targeting is
+-- getting critted, blood should spatter no matter who caused it" and "maybe
+-- it should be on for all nameplates visible"; the "Others' crits" setting:
+-- Off, My target, Nearby enemies). Effects.lua trims them first. Records
+-- stay yours. Fields after the 11 common ones:
 --   SWING_DAMAGE               amount 12, critical 18 (physical)
 --   RANGE_ / SPELL_ / SPELL_PERIODIC_DAMAGE   name 13, school 14, amount 15,
 --                                             critical 21
@@ -26,10 +31,9 @@ local _, DCM = ...
 --     target and its nameplate both: the same flag, amount, and school
 --     within DEDUPE seconds count once.
 --   - Solo (no group), every crit on an enemy is yours or your pet's.
---   - In a group, only with "Guess my crits in a group" (off by default): a
---     crit on your target within GROUP_WINDOW of your own successful
---     harmful cast counts as yours. With three others hitting the same
---     target, about one cast in three would also catch someone else's crit.
+--   - In a group whose crit it was cannot be told, so a crit on your target
+--     (and, with Nearby enemies, on an enemy nameplate) plays as others'
+--     crits; focus plays nothing, and nothing in a group makes a record.
 --   - Records, solo only: UNIT_COMBAT names no ability, so the hit is
 --     matched to your (or your pet's) last harmful cast from
 --     UNIT_SPELLCAST_SUCCEEDED (its spellID is readable for your own casts,
@@ -52,7 +56,6 @@ DCM.MELEE_NAME = MELEE_NAME
 local PHYSICAL = 1
 local MELEE_WINDOW = 0.4
 local SPELL_WINDOW = 1.5
-local GROUP_WINDOW = 0.6
 local DEDUPE = 0.05
 local TAKEN_FLAGS = {CRITICAL = true, CRUSHING = true}
 
@@ -144,6 +147,10 @@ local function OnCombatLog(...)
         Mine("pet", name, amount, critical, heal, school)
     elseif destGUID == player and critical and not heal and DCM.db.taken then
         DCM.PlayCrit({kind = "taken", school = school})
+    elseif critical and not heal and DCM.OthersOn(destGUID) then
+        -- Someone else's crit on your target or a nearby enemy: the effect,
+        -- never a record.
+        DCM.PlayCrit({kind = "others", school = school})
     end
 end
 
@@ -213,6 +220,49 @@ local function Repeated(flagText, amount, schoolMask, now)
     return repeated
 end
 
+-- Enemy nameplates shown now, by unit token and by GUID (the combat log
+-- names units by GUID).
+local plates, plateGUIDs = {}, {}
+
+local function Enemy(unit)
+    if type(UnitCanAttack) ~= "function" then
+        return true
+    end
+    local enemy = UnitCanAttack("player", unit)
+    return Plain(enemy) and enemy == true
+end
+
+local function PlateAdded(unit)
+    local guid = type(UnitGUID) == "function" and UnitGUID(unit) or nil
+    if not Plain(unit) or not Plain(guid) or guid == nil or not Enemy(unit) then
+        return
+    end
+    plates[unit] = guid
+    plateGUIDs[guid] = (plateGUIDs[guid] or 0) + 1
+end
+
+local function PlateRemoved(unit)
+    local guid = Plain(unit) and plates[unit]
+    if not guid then
+        return
+    end
+    plates[unit] = nil
+    plateGUIDs[guid] = plateGUIDs[guid] > 1 and plateGUIDs[guid] - 1 or nil
+end
+
+-- Whether others' crits on this GUID play: your target (My target, Nearby
+-- enemies), or a shown enemy nameplate (Nearby enemies).
+function DCM.OthersOn(destGUID)
+    local scope = DCM.db.othersScope
+    if scope == "off" or destGUID == nil then
+        return false
+    end
+    if destGUID == DCM.targetGUID then
+        return true
+    end
+    return scope == "nearby" and plateGUIDs[destGUID] ~= nil
+end
+
 local function OnUnitCombat(unit, action, flagText, amount, schoolMask)
     if not Plain(unit) or not Plain(action) or not Plain(flagText) then
         return
@@ -235,10 +285,12 @@ local function OnUnitCombat(unit, action, flagText, amount, schoolMask)
     end
     local critical = flagText == "CRITICAL"
     if InGroup() then
-        local mine = lastCast.player
-        if critical and unit == "target" and DCM.db.groupGuess and DCM.db.mine and mine
-                and now - mine.at <= GROUP_WINDOW then
-            DCM.PlayCrit({kind = "mine", school = School(schoolMask)})
+        -- Anyone's: your target, or with Nearby enemies an enemy nameplate;
+        -- no record.
+        local scope = DCM.db.othersScope
+        if critical and (unit == "target" and scope ~= "off"
+                or scope == "nearby" and unit:find("^nameplate%d+$") and Enemy(unit)) then
+            DCM.PlayCrit({kind = "others", school = School(schoolMask)})
         end
         return
     end
@@ -259,12 +311,59 @@ local function UpdatePet()
     DCM.petGUID = Plain(guid) and guid or nil
 end
 
+-- Druid forms whose crits are a beast's (Naturalist's claws): Cat 768, Bear
+-- 5487, Dire Bear 9634. GetShapeshiftFormInfo's fourth value is the form's
+-- spell (the pinned StanceBar.lua; Dyre's Buff Reminders reads it the same
+-- way). Cached on UPDATE_SHAPESHIFT_FORM; unreadable or secret: no form.
+local FERAL_FORMS = {[768] = true, [5487] = true, [9634] = true}
+
+local function UpdateForm()
+    DCM.feralForm = false
+    if type(GetNumShapeshiftForms) ~= "function" or type(GetShapeshiftFormInfo) ~= "function" then
+        return
+    end
+    local count = GetNumShapeshiftForms()
+    if not Plain(count) or type(count) ~= "number" then
+        return
+    end
+    for index = 1, count do
+        local _, active, _, spellID = GetShapeshiftFormInfo(index)
+        if Plain(active) and active == true then
+            DCM.feralForm = Plain(spellID) and FERAL_FORMS[spellID] == true
+            return
+        end
+    end
+end
+DCM.UpdateForm = UpdateForm
+
+-- A Hunter's pet is a beast (its crits claw on Naturalist); any other class's
+-- pet (a Warlock's demon) is not. The class never changes, so read once.
+local function UpdateClass()
+    local _, class = nil, nil
+    if type(UnitClass) == "function" then
+        _, class = UnitClass("player")
+    end
+    DCM.beastPet = Plain(class) and class == "HUNTER"
+end
+
+local function UpdateTarget()
+    local guid = type(UnitGUID) == "function" and UnitGUID("target") or nil
+    DCM.targetGUID = Plain(guid) and guid or nil
+end
+
 function DCM.InitializeDetect()
     local guid = UnitGUID("player")
     DCM.playerGUID = Plain(guid) and guid or nil
     UpdatePet()
+    UpdateTarget()
+    UpdateForm()
+    UpdateClass()
     events = CreateFrame("Frame")
     events:RegisterUnitEvent("UNIT_PET", "player")
+    events:RegisterEvent("PLAYER_TARGET_CHANGED")
+    events:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
+    events:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+    events:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
     local info = EventInfoFunction()
     if DCM.CombatLogUsable() and DCM.playerGUID then
         mode = "combatlog"
@@ -284,6 +383,14 @@ function DCM.InitializeDetect()
             OnCast(...)
         elseif event == "UNIT_PET" then
             UpdatePet()
+        elseif event == "PLAYER_TARGET_CHANGED" then
+            UpdateTarget()
+        elseif event == "UPDATE_SHAPESHIFT_FORM" then
+            UpdateForm()
+        elseif event == "NAME_PLATE_UNIT_ADDED" then
+            PlateAdded(...)
+        elseif event == "NAME_PLATE_UNIT_REMOVED" then
+            PlateRemoved(...)
         end
     end)
 end
