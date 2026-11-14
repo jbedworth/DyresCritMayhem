@@ -360,6 +360,8 @@ function DCM.ReportDebug()
         .. " adult=" .. tostring(DCM.IsAdult()) .. " stay=" .. DCM.db.stay
         .. " sounds=" .. tostring(DCM.SoundLibrary() ~= nil)
         .. " records=" .. count)
+    -- Why solo hits made no record (combat text only; zero on the combat log).
+    DCM.Report("debug: since login " .. DCM.RecordCountsText())
 end
 
 SLASH_DYRESCRITMAYHEM1 = PRIMARY_SLASH

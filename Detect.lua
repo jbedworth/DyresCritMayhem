@@ -64,6 +64,33 @@ local events
 -- The last harmful cast by you and by your pet: {name, at}.
 local lastCast = {}
 local lastWound
+-- Solo records from combat text, since login (/dcm debug): hits on an enemy
+-- (after DEDUPE), hits that made a record, and why the others made none. A
+-- hit can count under one school reason and one amount reason.
+local RECORD_REASONS = {"grouped", "secretSchool", "noCast", "secretAmount", "noAmount"}
+local recordCounts = {}
+
+local function ResetRecordCounts()
+    recordCounts = {hits = 0, recorded = 0}
+    for _, reason in ipairs(RECORD_REASONS) do
+        recordCounts[reason] = 0
+    end
+end
+ResetRecordCounts()
+DCM.ResetRecordCounts = ResetRecordCounts
+
+local function Count(field)
+    recordCounts[field] = recordCounts[field] + 1
+end
+
+-- "hits=N recorded=N grouped=N ...", for /dcm debug.
+function DCM.RecordCountsText()
+    local parts = {"hits=" .. recordCounts.hits, "recorded=" .. recordCounts.recorded}
+    for _, reason in ipairs(RECORD_REASONS) do
+        parts[#parts + 1] = reason .. "=" .. recordCounts[reason]
+    end
+    return table.concat(parts, " ")
+end
 
 local function EventInfoFunction()
     if type(C_CombatLog) == "table" and type(C_CombatLog.GetCurrentEventInfo) == "function" then
@@ -284,7 +311,9 @@ local function OnUnitCombat(unit, action, flagText, amount, schoolMask)
         return
     end
     local critical = flagText == "CRITICAL"
+    Count("hits")
     if InGroup() then
+        Count("grouped")
         -- Anyone's: your target, or with Nearby enemies an enemy nameplate;
         -- no record.
         local scope = DCM.db.othersScope
@@ -295,8 +324,20 @@ local function OnUnitCombat(unit, action, flagText, amount, schoolMask)
         return
     end
     local name, isPet = DCM.GuessAbility(schoolMask, now)
+    if not Plain(schoolMask) or type(schoolMask) ~= "number" then
+        Count("secretSchool")
+    elseif not name then
+        Count("noCast")
+    end
+    local readable = Plain(amount) and type(amount) == "number" and amount > 0
+    if not Plain(amount) then
+        Count("secretAmount")
+    elseif not readable then
+        Count("noAmount")
+    end
     local big = false
-    if name and Plain(amount) and type(amount) == "number" and amount > 0 then
+    if name and readable then
+        Count("recorded")
         big = DCM.Record(name, amount, critical, isPet, false)
     end
     local kind = isPet and "pet" or "mine"

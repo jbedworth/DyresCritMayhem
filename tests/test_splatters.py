@@ -131,15 +131,5 @@ class SplatterTests(unittest.TestCase):
         self.assertTrue(splatters.motion_preview(self.built).startswith(b"\x89PNG\r\n\x1a\n"))
 
 
-class ToolkitCopyTests(unittest.TestCase):
-    def test_the_suites_toolkit_copy_matches_the_toolkit(self):
-        toolkit = ROOT.parent / "DyresToolkit"
-        if not toolkit.is_dir():
-            self.skipTest("no ../DyresToolkit checkout")
-        for name in ("Core.lua", "Layout.lua", "Widgets.lua", "Settings.lua"):
-            self.assertEqual((ROOT / "tests" / "toolkit" / name).read_bytes(), (toolkit / name).read_bytes(),
-                             name)
-
-
 if __name__ == "__main__":
     unittest.main()

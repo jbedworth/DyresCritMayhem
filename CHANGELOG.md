@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+### Other changes
+
+- `/dcm debug` now adds a second line: how many of your solo hits it saw since login, how many made a record, and why the others made none.
+
 ## 0.2.0
 
 ### Features

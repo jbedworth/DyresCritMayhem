@@ -13,7 +13,9 @@ actionlint .github/workflows/*.yml
 
 tests/run.lua mocks the client: the combat log (fields at their real
 positions), `UNIT_COMBAT`, Settings, frames, AnimationGroups, chat, popups,
-Dyre's Sounds, and the real Dyre's Toolkit files from tests/toolkit. Its
+Dyre's Sounds, and the real Dyre's Toolkit files: from ../DyresToolkit when
+that checkout exists, else from the vendored tests/toolkit copy (as in CI).
+No test checks that the copy matches the checkout. Its
 `SetCVar` raises, and registering the combat log raises when the fixture
 restricts it, as Forever does. Mocks cannot show how the effects look, the
 real sounds, layout, taint, or secret values; those need the client.
@@ -210,7 +212,12 @@ in, and BugSack on to catch errors.
 14. **Anniversary**: repeat 1, 2, 4, and 10.
 15. **Forever, launch day** (about 5 minutes; Brutal or Tame at Medium):
     1. `/dcm debug`: `detection=unitcombat combatLogRestricted=true`, and no
-       blocked-action error since login.
+       blocked-action error since login. Its second line, `since login
+       hits=N recorded=N grouped=N secretSchool=N noCast=N secretAmount=N
+       noAmount=N`, counts hits on enemies and why each made no record:
+       in a group, a secret school, no cast to match, a secret amount, or
+       an amount not above 0. After a solo fight, `recorded` should be
+       above 0.
     2. `/dcm probe`, then solo: target a mob and fight it with your spells and
        melee, then let a fight end. In chat (first 40 lines):
        - `UNIT_COMBAT target WOUND CRITICAL amount=<n> school=<n>

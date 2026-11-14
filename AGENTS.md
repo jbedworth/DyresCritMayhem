@@ -173,7 +173,9 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
   with a StaticPopup and never in combat. The settings open from the
   toolkit's "Dyre's AddOns" page, the window's button, or `/dcm options`.
 - Commands: `/dcm` (or `records`), `options`, `test`, `unlock`, `lock`,
-  `reset` (the pop's place), `resetrecords`, `debug` and `probe` (both run
+  `reset` (the pop's place), `resetrecords`, `debug` (its second line counts
+  solo hits on enemies since login and why each made no record:
+  DCM.RecordCountsText in Detect.lua) and `probe` (both run
   while unavailable).
 
 ### Effects by damage school (0.2.0)
@@ -436,8 +438,9 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
   artwork/naturalist-preview.png. tests/test_splatters.py checks the committed
   textures match it.
 - tests/run.lua: the Lua 5.1 mock suite, loading the toolkit's real files
-  from tests/toolkit (which must match ../DyresToolkit; a Python test
-  checks when the checkout exists). tests/test_*.py: the release helpers and
+  from ../DyresToolkit when that checkout exists, else from the vendored
+  tests/toolkit copy (as in CI). No test checks that the copy matches the
+  checkout (John: a shared resource may change); the tests check behavior. tests/test_*.py: the release helpers and
   textures. .github/workflows/: CI, opt-in publishing, the approval gate
   check.
 - README.md (players), TESTING.md (method, source evidence, in-client

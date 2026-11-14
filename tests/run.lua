@@ -33,8 +33,18 @@ local ADDON = "DyresCritMayhem"
 local RUNTIME_FILES = {"Commands.lua", "Core.lua", "Themes.lua", "Effects.lua", "Detect.lua", "Records.lua",
     "Window.lua", "Probe.lua", "Options.lua"}
 -- Dyre's Toolkit's runtime files, without the minimap (it needs the embedded
--- libraries); tests/toolkit holds a copy, checked against ../DyresToolkit.
+-- libraries): the real ../DyresToolkit checkout when it exists, else the
+-- vendored tests/toolkit copy (as in CI). The copy may lag; the tests check
+-- behavior, never that the two match.
 local TOOLKIT_FILES = {"Core.lua", "Layout.lua", "Widgets.lua", "Settings.lua"}
+local TOOLKIT_DIR = "tests/toolkit/"
+do
+    local checkout = io.open("../DyresToolkit/Core.lua", "r")
+    if checkout then
+        checkout:close()
+        TOOLKIT_DIR = "../DyresToolkit/"
+    end
+end
 local PLAYER, PET, ENEMY = "Player-1-0001", "Pet-0-0002", "Creature-0-0003"
 
 -- A secret stands in for the client's opaque combat values; tests mark them with
@@ -450,7 +460,7 @@ local function fixture(options)
         state.toolkitNS = {InitializeMinimap = function() end}
         env.DyresToolkitDB = {snapToGrid = false}
         for _, path in ipairs(TOOLKIT_FILES) do
-            local chunk = assert(loadfile("tests/toolkit/" .. path))
+            local chunk = assert(loadfile(TOOLKIT_DIR .. path))
             setfenv(chunk, env)
             chunk("DyresToolkit", state.toolkitNS)
         end
@@ -576,7 +586,7 @@ end
 
 test("login prints the banner from the TOC and the ready hint", function()
     local state = fixture()
-    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.2.0 by Dyre")
+    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.2.1 by Dyre")
     contains(state.messages[2], "Type /dcm for your records")
     equal(#state.messages, 2, "nothing else at login")
 end)
@@ -2674,11 +2684,41 @@ end)
 test("the debug line names the detection path", function()
     local state = fixture()
     state.slash("debug")
-    contains(state.last(),
-        "detection=combatlog combatLogRestricted=false theme=tame intensity=off adult=false stay=100")
+    equal(state.said("detection=combatlog combatLogRestricted=false theme=tame intensity=off adult=false stay=100"),
+        true)
+    contains(state.last(), "debug: since login hits=0 recorded=0 grouped=0")
 end)
 
 -- WoW: Forever (the combat log refused) ---------------------------------------
+
+test("/dcm debug counts why solo hits on enemies made no record", function()
+    local state = fixture({restrictCombatLog = true})
+    state.dcm.ResetRecordCounts()
+    state.emit("UNIT_COMBAT", "target", "WOUND", "CRITICAL", 300, 1)
+    equal(next(state.db().records) ~= nil, true, "melee: a record")
+    state.now = state.now + 1
+    local amount = secret()
+    state.secrets[amount] = true
+    state.emit("UNIT_COMBAT", "target", "WOUND", "CRITICAL", amount, 1)
+    state.now = state.now + 1
+    local school = secret()
+    state.secrets[school] = true
+    state.emit("UNIT_COMBAT", "target", "WOUND", "CRITICAL", 310, school)
+    state.now = state.now + 1
+    state.emit("UNIT_COMBAT", "target", "WOUND", "CRITICAL", 320, 4)
+    state.now = state.now + 1
+    state.emit("UNIT_COMBAT", "target", "WOUND", "HIT", 0, 1)
+    state.now = state.now + 1
+    state.group = true
+    state.emit("UNIT_COMBAT", "target", "WOUND", "CRITICAL", 330, 1)
+    state.now = state.now + 1
+    state.emit("UNIT_COMBAT", "player", "WOUND", "CRITICAL", 340, 1)
+    equal(state.dcm.RecordCountsText(),
+        "hits=6 recorded=1 grouped=1 secretSchool=1 noCast=1 secretAmount=1 noAmount=1",
+        "a hit on you is not counted")
+    state.slash("debug")
+    contains(state.last(), "debug: since login hits=6 recorded=1 grouped=1 secretSchool=1 noCast=1")
+end)
 
 test("where the combat log is restricted it is never registered; UNIT_COMBAT stands in", function()
     local state = fixture({restrictCombatLog = true})
