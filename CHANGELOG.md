@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.2
+
+### Features
+
+- More gore: with an 18+ theme (Brutal, Spellburst, Fel, Naturalist), the Intensity slider also turns up the game's own blood on hit models (its violence level): Low 3, Medium 4, High and Total Mayhem 5. None, a cute theme, or clearing the 18+ box puts your own level back. DCM still never touches your volume or sound.
+- Off moved from the Intensity slider to the Theme list, as **None**, the first choice above Tame. The slider now goes from Low to Total Mayhem. A new character starts on Tame at Low. A character saved at Off is on None (at Low), so nothing changes for it.
+- Hit effects on enemies (on by default): every hit that does damage, damage over time too, plays its school's effect on the enemy, from its nameplate down over its body, following it as it moves. Physical: a blood spray (18+; else a white impact). Frost: snow and ice. Fire: the body bursts into flame. Arcane and nature: sparks; holy: golden sparkles. Shadow: smoke. Heals: green plus signs. A crit doubles it, throws it bigger and farther, and adds a big burst at the impact. It needs enemy nameplates on. Not in Tame yet.
+- Spellburst, Fel, and Naturalist are now styles of Brutal: the same gore and hit effects, but your own damage takes on the theme's character, while damage on you and other people's damage keep Brutal's look. Spellburst adds a glow in your spell's school color and stronger spell hits; Fel turns every school, even holy, to dark blood, purple, and fel green, with creeping cracks and dark smoke; Naturalist keeps its claws and bites, with earthy tints and leaves. Each keeps its own sounds and heal style.
+- Hit effects on you (on by default): the same when you are hit or healed, over your character.
+- Hit effects on bystanders: hits on other players, guards, and your friendly target play their hit effect on their nameplates too (with **Others' crits**), and their crits splatter your screen as others' crits; never a record.
+
+### Fixes
+
+- Spellburst is now 18+, like the other styles of Brutal, since it shows blood. A character saved on Spellburst without **I'm 18 or over** logs in on Tame.
+- WoW: Forever: no more empty records with no reason given. Forever hides how much each hit does from AddOns (in combat), so DCM cannot tell a highest hit or crit there. The records window now says so, and the crit effects still play. Classic Era and Anniversary keep their records.
+- WoW: Forever: the Records settings are greyed, with a tooltip that says why, and `/dcm` opens the settings instead of an empty records window (`/dcm records` still opens it).
+
 ## 0.2.1
 
 ### Other changes

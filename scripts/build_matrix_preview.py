@@ -20,9 +20,8 @@ tex = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(tex)
 OUTPUT = ROOT / "artwork" / "style-matrix-preview.png"
 KINDS = ["physical", "holy", "fire", "nature", "frost", "shadow", "arcane"]
-ROWS = [("tame", "", "TAME"), ("brutal", "", "BRUTAL"), ("spellburst", "adult", "SPELLBURST 18+"),
-        ("spellburst", "", "SPELLBURST"), ("fel", "", "FEL"), ("naturalist", "", "NATURALIST"),
-        ("brutal", "feral", "BRUTAL CAT")]
+ROWS = [("tame", "", "TAME"), ("brutal", "", "BRUTAL"), ("spellburst", "", "SPELLBURST"), ("fel", "", "FEL"),
+        ("naturalist", "", "NATURALIST"), ("brutal", "feral", "BRUTAL CAT")]
 CELL, GAP, LABEL = 112, 10, 180
 BACKGROUND = (34, 30, 28)
 TEXT = (230, 214, 170)

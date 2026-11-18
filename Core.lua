@@ -3,13 +3,14 @@ local addonName, DCM = ...
 -- Dyre's Crit Mayhem: opt-in mayhem on crits (author's design). A theme says
 -- what the effects look and sound like (Tame's butterflies and stars, the
 -- default; Brutal's blood, locked until the account's 18+ box is ticked); an
--- intensity from Off (the default) to Total Mayhem says how much, how big,
--- and how long; a personal record tracker keeps each ability's highest hit and crit.
+-- intensity from Low (the default) to Total Mayhem says how much, how big,
+-- and how long; the None theme turns it all off. A personal record tracker
+-- keeps each ability's highest hit and crit.
 -- This file owns the saved settings, the intensity, the 18+ lock, migration
 -- from earlier test builds, the login banner, install checks, the lock, slash
 -- commands, and startup.
--- Never changes a CVar (violence level, volume, sound): the AddOns we learned
--- from did, and that is out (author).
+-- Never changes a CVar but the violence level (DCM.ApplyGore): volume and
+-- sound stay out (author).
 local DEFAULT_TITLE = "Dyre's Crit Mayhem"
 local READY_MESSAGE = "  Ready. Type /dcm for your records, /dcm options for the mayhem."
 local SLASH_KEY = "DYRESCRITMAYHEM"
@@ -27,30 +28,35 @@ local THEME_LOCKED = "%s is for 18 and over: tick \"I'm 18 or over\" in /dcm opt
 -- 'Intensity'"), for whichever theme: each step is more, bigger, and longer.
 -- splats: how many land per crit; size: of the texture's size
 -- (Effects.SPLAT_SIZE, times the theme's own size); hold and fade: seconds
--- on screen and fading out, before the "Stays on screen" scale. Off (the
--- default) turns every effect off; records count at every intensity. Low to
+-- on screen and fading out, before the "Stays on screen" scale. Low is the
+-- default. Off moved to the Theme dropdown as None (author: "Move 'None'
+-- (zero) from the slider ... to the Theme selector"); a saved "off" becomes
+-- None at Low. Records count at every intensity. Low to
 -- Total Mayhem carry the earlier Fun, Spicy, Gory, and Mature numbers. The
 -- top step's key stays "max" (author renamed it "Total Mayhem"), so saved
--- settings carry over.
+-- settings carry over. violence: the game's violence level (0-5, its blood
+-- on hit models) a mature theme sets at this step (author: "the slot before
+-- Max and Max could set it to 5, with gradients in between"; None leaves the
+-- player's own level, not 0, which would take away the game's own blood);
+-- see DCM.ApplyGore.
 DCM.INTENSITIES = {
-    {key = "off", name = "Off"},
-    {key = "low", name = "Low", splats = 1, size = 0.5, hold = 1.6, fade = 0.9},
-    {key = "medium", name = "Medium", splats = 2, size = 0.7, hold = 2.8, fade = 1.2},
-    {key = "high", name = "High", splats = 4, size = 0.9, hold = 5.5, fade = 1.5},
-    {key = "max", name = "Total Mayhem", splats = 7, size = 1.15, hold = 10, fade = 2},
+    {key = "low", name = "Low", splats = 1, size = 0.5, hold = 1.6, fade = 0.9, violence = 3},
+    {key = "medium", name = "Medium", splats = 2, size = 0.7, hold = 2.8, fade = 1.2, violence = 4},
+    {key = "high", name = "High", splats = 4, size = 0.9, hold = 5.5, fade = 1.5, violence = 5},
+    {key = "max", name = "Total Mayhem", splats = 7, size = 1.15, hold = 10, fade = 2, violence = 5},
 }
 DCM.INTENSITY_INDEX = {}
 for index, intensity in ipairs(DCM.INTENSITIES) do
     DCM.INTENSITY_INDEX[intensity.key] = index
 end
-DCM.DEFAULT_INTENSITY = "off"
+DCM.DEFAULT_INTENSITY = "low"
 -- "Stays on screen" (author): a percent of the intensity's hold and fade.
 DCM.STAY_MIN, DCM.STAY_MAX, DCM.STAY_STEP, DCM.STAY_DEFAULT = 25, 300, 25, 100
 DCM.DEFAULT_THEME = "tame"
 -- Earlier test builds' levels (0.1.0 in development): each one's theme and
 -- intensity. Brutal only with the 18+ box, else Tame.
 local OLD_LEVELS = {
-    off = {intensity = "off"},
+    off = {theme = "none", intensity = "low"},
     tame = {theme = "tame", intensity = "low"},
     fun = {theme = "brutal", intensity = "low"},
     spicy = {theme = "brutal", intensity = "medium"},
@@ -63,6 +69,8 @@ DCM.WIDGET_KEY = "recordpop"
 local FLAGS = {
     sound = true,       -- the theme's sounds
     splatter = true,    -- the theme's effects on the screen
+    spray = true,       -- hit effects on enemies (on their nameplates)
+    hitsOnYou = true,   -- hit effects on your character
     mine = true,        -- your own crits
     pet = false,        -- your pet's crits
     taken = false,      -- crits that hit you
@@ -183,6 +191,10 @@ function DCM.SanitizeDB(db)
         db.theme = old.theme or db.theme
     end
     db.level = nil
+    -- Intensity Off (0.2.1 and older): the None theme at Low.
+    if db.intensity == "off" then
+        db.theme, db.intensity = DCM.NONE_THEME, DCM.DEFAULT_INTENSITY
+    end
     if not DCM.INTENSITY_INDEX[db.intensity] then
         db.intensity = DCM.DEFAULT_INTENSITY
     end
@@ -235,6 +247,10 @@ end
 function DCM.SanitizeAccountDB(db)
     db = type(db) == "table" and db or {}
     db.adult = db.adult == true
+    -- The player's own violence level, kept while a mature theme has raised
+    -- it (DCM.ApplyGore); nil when DCM has not changed it.
+    local own = tonumber(db.violenceOwn)
+    db.violenceOwn = own and own >= 0 and own <= 5 and tostring(math.floor(own)) or nil
     return db
 end
 
@@ -265,6 +281,7 @@ function DCM.SetIntensityIndex(index)
     if intensity then
         DCM.db.intensity = intensity.key
     end
+    DCM.ApplyGore()
     return DCM.IntensityIndex()
 end
 
@@ -280,6 +297,7 @@ function DCM.SetTheme(key)
         return DCM.Theme()
     end
     DCM.db.theme = theme.key
+    DCM.ApplyGore()
     return theme
 end
 
@@ -291,8 +309,84 @@ function DCM.SetAdult(adult)
         DCM.ClearEffects()
         DCM.Report(theme.name .. " is locked again; your theme is back to " .. DCM.Theme().name .. ".")
     end
+    DCM.ApplyGore()
     if type(DCM.RefreshOptions) == "function" then
         DCM.RefreshOptions()
+    end
+end
+
+-- The game's gore (author: "If we can figure out how to make it work, we
+-- already have a slider and a setting"; the one CVar DCM changes, by the
+-- author's ruling: never volume or mute). A mature theme (Brutal, Fel,
+-- Naturalist) at Low to Total Mayhem sets the violence level to its step's
+-- `violence`, first keeping the player's own level account-wide (the
+-- CVar is account-wide); None, a cute theme, or the 18+ box cleared puts the
+-- player's own level back. Only when the client has the CVar; in combat it
+-- waits for combat to end.
+local VIOLENCE_CVAR = "violenceLevel"
+local goreWaiting
+
+local function GetViolence()
+    local value
+    if type(C_CVar) == "table" and type(C_CVar.GetCVar) == "function" then
+        value = C_CVar.GetCVar(VIOLENCE_CVAR)
+    elseif type(GetCVar) == "function" then
+        value = GetCVar(VIOLENCE_CVAR)
+    end
+    if DCM.IsSecret(value) or value == nil then
+        return nil
+    end
+    return tostring(value)
+end
+
+local function SetViolence(value)
+    if type(C_CVar) == "table" and type(C_CVar.SetCVar) == "function" then
+        C_CVar.SetCVar(VIOLENCE_CVAR, value)
+    elseif type(SetCVar) == "function" then
+        SetCVar(VIOLENCE_CVAR, value)
+    end
+end
+
+-- The level DCM wants now, or nil to leave the player's own.
+function DCM.GoreLevel()
+    if not DCM.db or not DCM.Theme().mature or not DCM.IsAdult() then
+        return nil
+    end
+    return DCM.Intensity().violence
+end
+
+function DCM.ApplyGore()
+    if not DCM.db or not DCM.account then
+        return
+    end
+    local current = GetViolence()
+    if current == nil then
+        return
+    end
+    if InCombatLockdown() then
+        if not goreWaiting then
+            goreWaiting = CreateFrame("Frame")
+            goreWaiting:SetScript("OnEvent", function(self)
+                self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+                DCM.ApplyGore()
+            end)
+        end
+        goreWaiting:RegisterEvent("PLAYER_REGEN_ENABLED")
+        return
+    end
+    local level = DCM.GoreLevel()
+    if level then
+        if DCM.account.violenceOwn == nil then
+            DCM.account.violenceOwn = current
+        end
+        if current ~= tostring(level) then
+            SetViolence(tostring(level))
+        end
+    elseif DCM.account.violenceOwn ~= nil then
+        if current ~= DCM.account.violenceOwn then
+            SetViolence(DCM.account.violenceOwn)
+        end
+        DCM.account.violenceOwn = nil
     end
 end
 
@@ -415,5 +509,6 @@ events:SetScript("OnEvent", function(self, event, loadedName)
     DCM.InitializeRecords()
     DCM.InitializeDetect()
     DCM.InitializeOptions()
+    DCM.ApplyGore()
     toolkit.RegisterAddOn({addon = addonName, title = DCM.Title(), openSettings = DCM.OpenSettings})
 end)

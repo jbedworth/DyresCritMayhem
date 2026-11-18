@@ -115,13 +115,24 @@ function DCM.DetectionMode()
 end
 
 -- Records need the ability's name and a readable amount: from the combat
--- log, or guessed from combat text (UNIT_COMBAT) while solo.
+-- log, or guessed from combat text (UNIT_COMBAT) while solo. Combat text's
+-- amounts can be secret: WoW: Forever build 70938 hides every one in
+-- combat (John's /dcm probe, 2026-11-16: 996 of 996 hits), and its
+-- damage meter gives only per-spell totals after a fight, never a largest
+-- hit. So combat text keeps records only after a readable amount on an
+-- enemy (DCM.amountsReadable, the latest one seen wins); until then, and
+-- after a secret one, the window says records are not kept on this client.
 function DCM.RecordsAvailable()
-    return mode == "combatlog" or mode == "unitcombat"
+    return mode == "combatlog" or mode == "unitcombat" and DCM.amountsReadable == true
 end
 
 function DCM.RecordsGuessed()
-    return mode == "unitcombat"
+    return mode == "unitcombat" and DCM.amountsReadable == true
+end
+
+-- Combat text whose amounts this client hides (or has not shown yet).
+function DCM.AmountsHidden()
+    return mode == "unitcombat" and DCM.amountsReadable ~= true
 end
 
 local function Plain(value)
@@ -134,16 +145,55 @@ local function School(value)
     return Plain(value) and type(value) == "number" and value or nil
 end
 
-local function Mine(kind, name, amount, critical, heal, school)
-    if heal and not DCM.db.heals then
+-- A hit that did something: a readable positive amount, or one the client
+-- hides (it still landed).
+local function Landed(amount)
+    return not Plain(amount) or type(amount) == "number" and amount > 0
+end
+
+-- Where a hit plays (author: "It should look like it's happening to the
+-- target (mob, player avatar)"): on you, or on an enemy's nameplate (a heal
+-- on your target, on its plate, friendly plates shown). nil: nowhere.
+local function HitTarget(destGUID, heal)
+    if destGUID == DCM.playerGUID then
+        return "self", nil
+    end
+    local unit = DCM.PlateUnit(destGUID)
+    if not unit and heal and destGUID == DCM.targetGUID then
+        unit = "target"
+    end
+    return unit and "target" or nil, unit
+end
+
+-- The hit effect for any damage or heal that landed (author: "every time a
+-- hit lands and does damage (even DoTs, ideally) ... when it crits, it
+-- should double"). Nature damage over time shows nothing: the game draws
+-- its own green cloud on a poisoned mob.
+local function Hit(kind, subevent, amount, critical, heal, school, destGUID, big, bystander)
+    if not Landed(amount) or subevent == "SPELL_PERIODIC_DAMAGE" and DCM.SchoolKind(school) == "nature" then
         return
     end
+    local where, unit = HitTarget(destGUID, heal)
+    if not where then
+        return
+    end
+    DCM.PlayHit({kind = where == "self" and "taken" or kind, unit = unit, school = school, crit = critical,
+        big = big, heal = heal, bystander = bystander})
+end
+
+local function Mine(kind, name, amount, critical, heal, school, destGUID, subevent)
     local big = false
-    if Plain(name) and Plain(amount) and type(name) == "string" and type(amount) == "number" then
+    if (not heal or DCM.db.heals) and Plain(name) and Plain(amount) and type(name) == "string"
+            and type(amount) == "number" then
         big = DCM.Record(name, amount, critical, kind == "pet", heal)
     end
-    if critical and DCM.db[kind] then
-        DCM.PlayCrit({kind = kind, big = big, heal = heal, school = school})
+    if not DCM.db[kind] then
+        return
+    end
+    Hit(kind, subevent, amount, critical, heal, school, destGUID, big)
+    if critical and (not heal or DCM.db.heals) then
+        DCM.PlayCrit({kind = kind, big = big, heal = heal, school = school,
+            unit = not heal and DCM.PlateUnit(destGUID) or nil})
     end
 end
 
@@ -169,15 +219,30 @@ local function OnCombatLog(...)
     critical = critical == true
     local player = DCM.playerGUID
     if sourceGUID == player then
-        Mine("mine", name, amount, critical, heal, school)
+        Mine("mine", name, amount, critical, heal, school, destGUID, subevent)
     elseif sourceGUID ~= nil and sourceGUID == DCM.petGUID then
-        Mine("pet", name, amount, critical, heal, school)
-    elseif destGUID == player and critical and not heal and DCM.db.taken then
-        DCM.PlayCrit({kind = "taken", school = school})
-    elseif critical and not heal and DCM.OthersOn(destGUID) then
-        -- Someone else's crit on your target or a nearby enemy: the effect,
+        Mine("pet", name, amount, critical, heal, school, destGUID, subevent)
+    elseif destGUID == player then
+        -- A hit or heal on you, from anyone.
+        Hit("taken", subevent, amount, critical, heal, school, destGUID, false)
+        if critical and not heal and DCM.db.taken then
+            DCM.PlayCrit({kind = "taken", school = school})
+        end
+    elseif not heal and DCM.OthersOn(destGUID) then
+        -- Someone else's hit on your target or a nearby enemy: the effect,
         -- never a record.
-        DCM.PlayCrit({kind = "others", school = school})
+        Hit("others", subevent, amount, critical, false, school, destGUID, false)
+        if critical then
+            DCM.PlayCrit({kind = "others", school = school, unit = DCM.PlateUnit(destGUID)})
+        end
+    elseif not heal and DCM.BystanderOn(destGUID) then
+        -- A hit on someone not your enemy (another player, a guard, your
+        -- friendly target): its hit effect, and a crit as others' crits
+        -- (author: "put the crit splatter from other's crits back").
+        Hit("others", subevent, amount, critical, false, school, destGUID, false, true)
+        if critical then
+            DCM.PlayCrit({kind = "others", school = school, unit = DCM.PlateUnit(destGUID)})
+        end
     end
 end
 
@@ -248,8 +313,12 @@ local function Repeated(flagText, amount, schoolMask, now)
 end
 
 -- Enemy nameplates shown now, by unit token and by GUID (the combat log
--- names units by GUID).
+-- names units by GUID); and the other nameplates shown (bystanders: other
+-- players, guards), for their hit effects (author, 2026-11-17: someone "not
+-- in my group, and they were not being targeted ... I could still see their
+-- bloodsplatter as if they were an enemy mob, and, I liked it").
 local plates, plateGUIDs = {}, {}
+local bystanders, bystanderGUIDs = {}, {}
 
 local function Enemy(unit)
     if type(UnitCanAttack) ~= "function" then
@@ -261,20 +330,57 @@ end
 
 local function PlateAdded(unit)
     local guid = type(UnitGUID) == "function" and UnitGUID(unit) or nil
-    if not Plain(unit) or not Plain(guid) or guid == nil or not Enemy(unit) then
+    if not Plain(unit) or not Plain(guid) or guid == nil or guid == DCM.playerGUID then
         return
     end
-    plates[unit] = guid
-    plateGUIDs[guid] = (plateGUIDs[guid] or 0) + 1
+    if Enemy(unit) then
+        plates[unit] = guid
+        plateGUIDs[guid] = (plateGUIDs[guid] or 0) + 1
+    else
+        bystanders[unit] = guid
+        bystanderGUIDs[guid] = (bystanderGUIDs[guid] or 0) + 1
+    end
+end
+
+-- The unit token for an enemy GUID from the combat log, for the spray on
+-- its nameplate: your target, or a shown enemy nameplate; else nil.
+function DCM.PlateUnit(guid)
+    if guid == nil or not Plain(guid) then
+        return nil
+    end
+    if guid == DCM.targetGUID then
+        return "target"
+    end
+    for unit, plateGUID in pairs(plates) do
+        if plateGUID == guid then
+            return unit
+        end
+    end
+    for unit, plateGUID in pairs(bystanders) do
+        if plateGUID == guid then
+            return unit
+        end
+    end
 end
 
 local function PlateRemoved(unit)
-    local guid = Plain(unit) and plates[unit]
-    if not guid then
+    if Plain(unit) and DCM.ReleaseSprays then
+        -- Nameplates are reused: a spray never moves on to the next enemy.
+        DCM.ReleaseSprays(unit)
+    end
+    if not Plain(unit) then
         return
     end
-    plates[unit] = nil
-    plateGUIDs[guid] = plateGUIDs[guid] > 1 and plateGUIDs[guid] - 1 or nil
+    local guid = plates[unit]
+    if guid then
+        plates[unit] = nil
+        plateGUIDs[guid] = plateGUIDs[guid] > 1 and plateGUIDs[guid] - 1 or nil
+    end
+    guid = bystanders[unit]
+    if guid then
+        bystanders[unit] = nil
+        bystanderGUIDs[guid] = bystanderGUIDs[guid] > 1 and bystanderGUIDs[guid] - 1 or nil
+    end
 end
 
 -- Whether others' crits on this GUID play: your target (My target, Nearby
@@ -285,9 +391,22 @@ function DCM.OthersOn(destGUID)
         return false
     end
     if destGUID == DCM.targetGUID then
-        return true
+        return Enemy("target")
     end
     return scope == "nearby" and plateGUIDs[destGUID] ~= nil
+end
+
+-- Whether a hit on this GUID plays as a bystander's: your friendly target
+-- (My target, Nearby enemies), or another nameplate shown (Nearby enemies).
+function DCM.BystanderOn(destGUID)
+    local scope = DCM.db.othersScope
+    if scope == "off" or destGUID == nil or destGUID == DCM.playerGUID then
+        return false
+    end
+    if destGUID == DCM.targetGUID then
+        return not Enemy("target")
+    end
+    return scope == "nearby" and bystanderGUIDs[destGUID] ~= nil
 end
 
 local function OnUnitCombat(unit, action, flagText, amount, schoolMask)
@@ -295,12 +414,22 @@ local function OnUnitCombat(unit, action, flagText, amount, schoolMask)
         return
     end
     if unit == "player" then
+        -- Every hit and heal on you plays on you.
+        if action == "WOUND" or action == "HEAL" then
+            DCM.PlayHit({kind = "taken", school = School(schoolMask), crit = flagText == "CRITICAL",
+                heal = action == "HEAL"})
+        end
         if action == "WOUND" and TAKEN_FLAGS[flagText] and DCM.db.taken then
             DCM.PlayCrit({kind = "taken", school = School(schoolMask)})
         elseif action == "HEAL" and flagText == "CRITICAL" and DCM.db.heals and not InGroup() then
             -- Solo, a crit heal on you is most likely yours.
             DCM.PlayCrit({kind = "mine", heal = true, school = School(schoolMask)})
         end
+        return
+    end
+    if action == "HEAL" and unit == "target" then
+        -- A heal on your (friendly) target, on its plate when one shows.
+        DCM.PlayHit({kind = "mine", unit = unit, crit = flagText == "CRITICAL", heal = true})
         return
     end
     if action ~= "WOUND" or not DCM.EnemyUnit(unit) then
@@ -310,6 +439,23 @@ local function OnUnitCombat(unit, action, flagText, amount, schoolMask)
     if Repeated(flagText, amount, schoolMask, now) then
         return
     end
+    -- A unit you cannot attack (author: "enemies only") is never your hit:
+    -- a bystander (another player, a guard, your friendly target), by the
+    -- Others' crits setting: its hit effect, and a crit as others' crits
+    -- (author: "put the crit splatter from other's crits back"); never a
+    -- record.
+    if not Enemy(unit) then
+        local scope = DCM.db.othersScope
+        if unit == "target" and scope ~= "off" or scope == "nearby" and unit:find("^nameplate%d+$") then
+            local critical = flagText == "CRITICAL"
+            DCM.PlayHit({kind = "others", bystander = true, school = School(schoolMask), unit = unit,
+                crit = critical})
+            if critical then
+                DCM.PlayCrit({kind = "others", school = School(schoolMask), unit = unit})
+            end
+        end
+        return
+    end
     local critical = flagText == "CRITICAL"
     Count("hits")
     if InGroup() then
@@ -317,9 +463,12 @@ local function OnUnitCombat(unit, action, flagText, amount, schoolMask)
         -- Anyone's: your target, or with Nearby enemies an enemy nameplate;
         -- no record.
         local scope = DCM.db.othersScope
-        if critical and (unit == "target" and scope ~= "off"
-                or scope == "nearby" and unit:find("^nameplate%d+$") and Enemy(unit)) then
-            DCM.PlayCrit({kind = "others", school = School(schoolMask)})
+        if unit == "target" and scope ~= "off"
+                or scope == "nearby" and unit:find("^nameplate%d+$") then
+            DCM.PlayHit({kind = "others", school = School(schoolMask), unit = unit, crit = critical})
+            if critical then
+                DCM.PlayCrit({kind = "others", school = School(schoolMask), unit = unit})
+            end
         end
         return
     end
@@ -331,9 +480,13 @@ local function OnUnitCombat(unit, action, flagText, amount, schoolMask)
     end
     local readable = Plain(amount) and type(amount) == "number" and amount > 0
     if not Plain(amount) then
+        DCM.amountsReadable = false
         Count("secretAmount")
     elseif not readable then
         Count("noAmount")
+    end
+    if readable then
+        DCM.amountsReadable = true
     end
     local big = false
     if name and readable then
@@ -341,8 +494,11 @@ local function OnUnitCombat(unit, action, flagText, amount, schoolMask)
         big = DCM.Record(name, amount, critical, isPet, false)
     end
     local kind = isPet and "pet" or "mine"
-    if critical and DCM.db[kind] then
-        DCM.PlayCrit({kind = kind, big = big, school = School(schoolMask)})
+    if DCM.db[kind] then
+        DCM.PlayHit({kind = kind, school = School(schoolMask), unit = unit, crit = critical, big = big})
+        if critical then
+            DCM.PlayCrit({kind = kind, big = big, school = School(schoolMask), unit = unit})
+        end
     end
 end
 DCM.OnUnitCombat = OnUnitCombat

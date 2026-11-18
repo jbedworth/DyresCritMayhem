@@ -98,7 +98,7 @@ class ReleaseTests(unittest.TestCase):
         checked = builder.validate_archive(path, self.version)
         self.assertEqual(checked, dict(manifest, tag=""))
         notes = " ".join((self.output / "release-notes.md").read_text().split())
-        for text in ("beta 1.60.1", "70450", "Off (the default)", "Classic Era and Anniversary",
+        for text in ("beta 1.60.1", "70450", "Low (the default)", "Classic Era and Anniversary",
                      "Never changes your game settings", "`/dcm options`"):
             self.assertIn(text, notes)
         with zipfile.ZipFile(path) as archive:

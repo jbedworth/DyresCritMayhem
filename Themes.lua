@@ -59,6 +59,14 @@ DCM.EXTRA_CHANCE = 0.3
 
 local themes, order = {}, {}
 
+-- None (author: "Move 'None' (zero) from the slider ... to the Theme
+-- selector. Have it be the first item, above Tame"): every effect and sound
+-- off; records still count. Not in DCM.Themes() (the effect themes); the
+-- Theme dropdown lists it first.
+DCM.NONE_THEME = "none"
+themes[DCM.NONE_THEME] = {key = DCM.NONE_THEME, name = "None", none = true, sounds = {},
+    description = "No effects or sounds. Your records still count."}
+
 function DCM.RegisterTheme(theme)
     assert(type(theme) == "table" and type(theme.key) == "string" and type(theme.name) == "string",
         "DCM.RegisterTheme: key and name")
@@ -90,6 +98,68 @@ function DCM.Theme()
     return themes[DCM.db and DCM.db.theme] or themes[DCM.DEFAULT_THEME]
 end
 
+-- How each school's hit looks on its target (author: "physical:
+-- bloodspray/splatter, cold/frost: snow/ice flurries; fire: burning flames
+-- raining down; arcane: spark showers; shadow/fel: black or greenish smoke";
+-- "heals should be little green +'s"): textures, tints, blend, size, and
+-- motion (Effects.lua HIT_MOTIONS); upright: turned only a little, tip up:
+--   spray: out from the body and falling (blood);
+--   flurry: from above the body, drifting down and turning (snow and ice);
+--   blaze: the body on fire (author: "When you cast a warlock's immolate
+--   spell, it makes it look like the mob is burning ... I want that same
+--   effect for every tick of fire damage"; then, from screenshots, our
+--   flame shapes were "cartoon flame leafs" next to Immolate's soft glow):
+--   soft smoke puffs drawn as added light in fire colors around a bright
+--   yellow core, roiling and swelling on the body, then fading;
+--   burst: out in every direction, fast and short (sparks);
+--   smoke: rising slowly and spreading;
+--   rise: floating up (holy light, heals).
+-- Nature (lightning, Wrath, poisons) is a green crackle of sparks. Physical
+-- blood needs the 18+ box, as on the screen; without it, a white impact
+-- (impact). A variant's `hits` restyle these for your damage (Variant).
+-- flash: a crit's one big piece at the impact (author, 2026-11-17: "crits
+-- are not visibly discernable from normal hits"), times the piece size:
+-- a burst of blood, else a glow or a puff in the school's colors.
+DCM.HIT_STYLES = {
+    physical = {textures = {TEXTURES .. "Splat1", TEXTURES .. "Splat2", TEXTURES .. "Splat3", TEXTURES .. "Splat4"},
+        colors = {{0.55, 0, 0}, {0.42, 0.02, 0.02}}, blend = "BLEND", size = 1, motion = "spray",
+        flash = {texture = TEXTURES .. "Splat3", blend = "BLEND", size = 3.2}},
+    impact = {textures = {TEXTURES .. "Sparkle1", TEXTURES .. "Mote1"},
+        colors = {{1, 1, 1}, {0.9, 0.9, 0.85}}, blend = "ADD", size = 0.6, motion = "burst",
+        flash = {texture = TEXTURES .. "Burst1", blend = "ADD", size = 4}},
+    -- Dense and fine (author: "increase the number of frost particles and
+    -- cut their size so it's not so obviously a cartoon snowflake"): mostly
+    -- soft motes, some small flakes and shards. count: times the pieces.
+    frost = {textures = {TEXTURES .. "Mote1", TEXTURES .. "Mote1", TEXTURES .. "Mote1", TEXTURES .. "Snowflake1",
+        TEXTURES .. "Snowflake1", TEXTURES .. "Shard1"},
+        colors = {{0.85, 0.95, 1}, {0.6, 0.8, 1}, {1, 1, 1}}, blend = "BLEND", size = 0.35, count = 2.5,
+        motion = "flurry",
+        flash = {texture = TEXTURES .. "Burst1", blend = "ADD", size = 4}},
+    fire = {textures = {TEXTURES .. "Smoke1", TEXTURES .. "Smoke2", TEXTURES .. "Smoke1", TEXTURES .. "Burst2"},
+        colors = {{1, 0.3, 0.04}, {1, 0.5, 0.08}, {1, 0.72, 0.2}}, blend = "ADD", size = 1.1, motion = "blaze",
+        textureColors = {[TEXTURES .. "Burst2"] = {1, 0.88, 0.4}},
+        flash = {texture = TEXTURES .. "Burst2", blend = "ADD", size = 3.5}},
+    arcane = {textures = {TEXTURES .. "Sparkle1", TEXTURES .. "Sparkle1", TEXTURES .. "Mote1"},
+        colors = {{0.75, 0.5, 1}, {0.95, 0.82, 1}}, blend = "ADD", size = 0.6, motion = "burst",
+        flash = {texture = TEXTURES .. "Burst1", blend = "ADD", size = 4.5}},
+    shadow = {textures = {TEXTURES .. "Smoke1", TEXTURES .. "Smoke2"},
+        colors = {{0.12, 0.05, 0.16}, {0.05, 0.05, 0.06}}, blend = "BLEND", size = 1.2, motion = "smoke",
+        flash = {texture = TEXTURES .. "Smoke1", blend = "BLEND", size = 2.6}},
+    -- Dense and fine, as frost (author: "Do the same for nature").
+    nature = {textures = {TEXTURES .. "Mote1", TEXTURES .. "Mote1", TEXTURES .. "Mote1", TEXTURES .. "Sparkle1"},
+        colors = {{0.55, 1, 0.35}, {0.9, 1, 0.65}, {0.75, 1, 0.5}}, blend = "ADD", size = 0.3, count = 2.5,
+        motion = "burst",
+        flash = {texture = TEXTURES .. "Burst1", blend = "ADD", size = 4.5}},
+    -- As arcane, in gold (author: "drop the circle-halo thingy, and make it
+    -- look more like arcane, but with golden sparkles").
+    holy = {textures = {TEXTURES .. "Sparkle1", TEXTURES .. "Sparkle1", TEXTURES .. "Mote1"},
+        colors = {{1, 0.82, 0.3}, {1, 0.93, 0.6}}, blend = "ADD", size = 0.6, motion = "burst",
+        flash = {texture = TEXTURES .. "Burst1", blend = "ADD", size = 4.5}},
+    heal = {textures = {TEXTURES .. "Plus1"},
+        colors = {{0.35, 1, 0.35}, {0.6, 1, 0.5}}, blend = "BLEND", size = 0.45, motion = "rise",
+        flash = {texture = TEXTURES .. "Burst1", blend = "ADD", size = 6}},
+}
+
 -- Whether a theme's touch (drips, the squelch) is on at this intensity.
 function DCM.ThemeFrom(fromKey, intensityIndex)
     return fromKey ~= nil and intensityIndex >= DCM.INTENSITY_INDEX[fromKey]
@@ -99,6 +169,9 @@ DCM.RegisterTheme({
     key = "tame",
     name = "Tame",
     description = "Butterflies, stars, and sparkles in soft pastels, with light shimmers.",
+    -- No hit effects on the target yet (author: "Tame gets none of these on
+    -- target effects for now; we can design this later").
+    noHits = true,
     -- A rainbow among them (author: "I intended it as a texture to add to
     -- Tame to vary what shows up"), drawn in its own colors.
     splats = {TEXTURES .. "Butterfly1", TEXTURES .. "Butterfly2", TEXTURES .. "Star1", TEXTURES .. "Sparkle1",
@@ -200,30 +273,47 @@ DCM.RegisterTheme({
     },
 })
 
--- For casters and healers (author: "something for mages, warlocks and
--- priests ... doing their thing at range"): bursts of light tinted by spell
--- school, motes that rise from Medium, a ring from High and for a new
--- record; crit heals show too, rising in holy or nature light. Original
--- textures (scripts/build_splatters.py), drawn additively.
-DCM.RegisterTheme({
+-- Variants of Brutal (author, 2026-11-17: "pivot the themes to be variants
+-- of Brutal that stylize the baseline effects, instead of being a completely
+-- different set ... Brutal is neutral, keeps the default effects looking
+-- default. But picking a theme puts me 'in character'"; "effects on me
+-- retain the brutal effect. What I'm stylizing is the damage I'm doing").
+-- A variant (`variant = true`) draws Brutal's splatter, drips, runs, and
+-- school looks for your and your pet's damage, in its own colors, with its
+-- own touch (`extraAccent`) and hit effects (`hits`, over DCM.HIT_STYLES);
+-- damage on you and others' damage draw Brutal itself (DCM.Look,
+-- Effects.lua). Each keeps its own sounds and heal style. Built at the end
+-- of this file (Variant).
+local function BrutalBase(theme)
+    local brutal = themes.brutal
+    for _, field in ipairs({"splats", "colors", "size", "drips", "dripsFrom", "run", "runChance"}) do
+        if theme[field] == nil then
+            theme[field] = brutal[field]
+        end
+    end
+    theme.variant = true
+    return theme
+end
+themes.brutal.variant = true
+
+-- Spellburst (author: "something for mages, warlocks and priests ... doing
+-- their thing at range"): Brutal's gore charged with magic, a glow of your
+-- spell's school on every crit, a ring for a new record, and stronger,
+-- brighter spell hits. 18+ (author: "18+ only"), since it shows Brutal's
+-- blood. Crit heals: light rising, holy gold and nature green.
+DCM.RegisterTheme(BrutalBase({
     key = "spellburst",
     name = "Spellburst",
-    description = "Bursts of light in your spell's school: fire, frost, arcane, shadow, nature, holy.",
-    splats = {TEXTURES .. "Burst1", TEXTURES .. "Burst2"},
-    colors = {UNKNOWN_SCHOOL},
-    schoolColors = true,
-    blend = "ADD",
-    heals = true,
-    size = 0.9,
-    drips = {TEXTURES .. "Mote1"},
-    dripsFrom = "medium",
-    dripMotion = "float",
+    description = "Brutal's gore charged with magic: a glow of your spell's school on every crit, and brighter "
+        .. "spell hits.",
+    mature = true,
     ring = TEXTURES .. "Ring1",
-    ringFrom = "high",
-    animations = {
-        [TEXTURES .. "Burst1"] = "spin",
-        [TEXTURES .. "Burst2"] = "twinkle",
-        [TEXTURES .. "Ring1"] = "twinkle",
+    heal = {
+        splats = {TEXTURES .. "Burst1", TEXTURES .. "Mote1"},
+        colors = {{1, 0.92, 0.6}, {0.4, 1, 0.4}},
+        blend = "ADD",
+        size = 0.8,
+        animations = {[TEXTURES .. "Burst1"] = "spin"},
     },
     -- From Dyre's Sounds' own until dedicated magic sounds join it. Its
     -- files (Dyre's Picks) play everywhere; the game's kit sounds only where
@@ -234,7 +324,7 @@ DCM.RegisterTheme({
         extra = {"teleportvanish", "disappearingswoosh", "impactsbubblesmash"},
         extraFrom = "medium",
     },
-})
+}))
 
 -- A color for a crit of this school from the theme's schoolPalette, or nil
 -- for the theme's own colors (picked per effect).
@@ -251,36 +341,27 @@ end
 
 local FEL_GREEN = {0.35, 0.9, 0.15}
 local SHADOW = {0.22, 0.08, 0.3}
-local HELLFIRE = {0.95, 0.3, 0.08}
 
--- Dark and scary, not gory (author: "a darker, more... mature theme for
--- warlocks ... No magic twinkles or sparkles, keep it scary/dark"; working
--- name, one string to rename): smoke that curls as it rises and dissolves,
--- falling embers or ash from Medium, cracks that spread from where it
--- landed, and a dark vignette around the screen for a new record. Fel
--- green, shadow purple-black, and hellfire; shadow crits are shadow, fire
--- crits hellfire or fel. Original textures (scripts/build_splatters.py).
-DCM.RegisterTheme({
+local FEL_PURPLE, FEL_DUSK, FEL_DARK = {0.38, 0.1, 0.55}, {0.16, 0.05, 0.22}, {0.14, 0.38, 0.05}
+local DARK_BLOOD = {0.45, 0.02, 0.05}
+
+-- Fel (author: "a darker, more... mature theme for warlocks ... keep it
+-- scary/dark"; then: "Fel is gives the effects from Brutal an evil,
+-- demonic tinge, mixing in fel green and purple shades", and "If I choose
+-- Fel on my Paladin, Holy is no longer a golden glow/sparkle. It's now a
+-- more evil black/purple/fel-green effect"): Brutal's wounds in dark blood,
+-- purple, and fel green for every school, cracks creeping from them, a
+-- wisp of dark smoke on each crit, and the dark vignette for a new record.
+-- 18+ (author: "If we do anything truly demonic, it gets 18+").
+DCM.RegisterTheme(BrutalBase({
     key = "fel",
     name = "Fel",
-    description = "Dark smoke, falling embers, and creeping cracks in fel green, shadow, and hellfire.",
-    -- Demonic, so 18+ like Brutal (author: "If we do anything truly demonic,
-    -- it gets 18+").
+    description = "Brutal's gore with a demonic tinge: dark blood, purple, and fel green for every school, "
+        .. "creeping cracks, and dark smoke.",
     mature = true,
-    splats = {TEXTURES .. "Smoke1", TEXTURES .. "Smoke2"},
-    colors = {FEL_GREEN, SHADOW, HELLFIRE},
-    schoolPalette = {
-        {mask = 32, colors = {SHADOW}},
-        {mask = 4, colors = {HELLFIRE, FEL_GREEN}},
-    },
-    size = 1,
-    motion = "float",
-    drips = {TEXTURES .. "Embers1"},
-    dripsFrom = "medium",
-    textureBlend = {[TEXTURES .. "Embers1"] = "ADD"},
+    colors = {DARK_BLOOD, DARK_BLOOD, FEL_DUSK, FEL_DARK},
     run = TEXTURES .. "Crack1",
     runGrow = "center",
-    runChance = {low = 0.2, medium = 0.3, high = 0.4, max = 0.5},
     vignette = TEXTURES .. "Vignette1",
     -- Heal crits: glowing fel-green wisps drawn upward, no sparkle.
     heal = {
@@ -292,11 +373,6 @@ DCM.RegisterTheme({
             [TEXTURES .. "Smoke1"] = "spin",
             [TEXTURES .. "Smoke2"] = "spin",
         },
-    },
-    -- The smoke curls: a slow turn.
-    animations = {
-        [TEXTURES .. "Smoke1"] = "spin",
-        [TEXTURES .. "Smoke2"] = "spin",
     },
     -- Dyre's Fel Sounds (Dyre's Sounds 1.4.0; author: "Here are some 'Fel
     -- Sounds' for that theme"), files, so they play on Classic Era: a wet
@@ -316,39 +392,33 @@ DCM.RegisterTheme({
             extra = {"orcfury", "instrumentspitchpipedistressed"},
         },
     },
-})
+}))
 
 -- Naturalist, for Druids and nature (author: "let's make it more mature and a
--- touch gory, not whimsical"; author: "Naturalist is the theme name"): 18+
--- like Brutal and Fel. Its own look is savage, for every physical crit
--- (author: "random splatter or claw/bite marks is fine for the theme"):
--- claw rakes of two, three, or four scratches, a bite mark, and Brutal's
--- splatter, mixed in every set (author: "make sure it mixes up the base effect (bite,
--- scratches, splatter) ... the bite and scratch direction (and number of
--- scratches) should be random; not uniform"), each turned any way, mirrored
--- at random, and sized a little differently like every splat; some grow a
--- run, always straight down the screen (StartRun). Its "Claws only in Cat or
--- Bear form" box (`clawsInForm`, off by default; `formClaws` marks the theme
--- that offers it) keeps the claws to a beast's crits (DCM.FeralCrit), Brutal's
--- splatter otherwise. The schools (below) bring a
--- murky green burst with insects and torn leaves, silver fireworks, and
--- darker, graphic leaves. Heal crits: vines sprouting and green and gold
--- smoke rising, never flowers. A new record: Fel's vignette, deep green.
--- Original textures (scripts/build_splatters.py).
-DCM.RegisterTheme({
+-- touch gory, not whimsical"; "Naturalist is the theme name"), a variant of
+-- Brutal (author: "Yes, a variant"): physical its claw rakes of two, three,
+-- or four scratches, a bite mark, and Brutal's splatter, mixed in every set
+-- (author: "make sure it mixes up the base effect (bite, scratches,
+-- splatter) ... the bite and scratch direction (and number of scratches)
+-- should be random; not uniform"), each turned any way, mirrored at
+-- random, and sized a little differently; some grow a run, always straight
+-- down the screen (StartRun). Its "Claws only in Cat or Bear form" box
+-- (`clawsInForm`, off by default; `formClaws` marks the theme that offers
+-- it) keeps the claws to a beast's crits (DCM.FeralCrit), Brutal's splatter
+-- otherwise. The other schools: Brutal's in earthy tints (moss, bark,
+-- amber, silver), with leaves blowing from a nature crit. Heal crits: vines
+-- sprouting and green and gold smoke rising, never flowers. A new record:
+-- the vignette in deep green. 18+ like Brutal and Fel.
+DCM.RegisterTheme(BrutalBase({
     key = "naturalist",
     name = "Naturalist",
-    description = "Savage claws and bites, wrathful green bursts, and torn, burning, and rotting leaves.",
+    description = "Brutal's gore gone feral: claws and bites, earthy tints, and leaves torn loose.",
     mature = true,
     splats = {TEXTURES .. "Claw1", TEXTURES .. "Claw2", TEXTURES .. "Claw3", TEXTURES .. "Bite1",
         TEXTURES .. "Splat1", TEXTURES .. "Splat3"},
     colors = {{0.6, 0.02, 0.02}, {0.48, 0.02, 0.02}},
-    size = 1,
-    drips = {TEXTURES .. "Drip1", TEXTURES .. "Drip2"},
-    dripsFrom = "high",
     -- Some marks drip at random (author: "3-4 claw scratches that randomly
     -- drip blood"), a little more often than Brutal's.
-    run = TEXTURES .. "Run1",
     runChance = {low = 0.3, medium = 0.4, high = 0.5, max = 0.65},
     formClaws = true,
     vignette = TEXTURES .. "Vignette2",
@@ -373,7 +443,7 @@ DCM.RegisterTheme({
         extra = {"wetsplat"},
         extraFrom = "medium",
     },
-})
+}))
 
 -- Effects by damage school (author: "Physical vs. magic, and each school of
 -- magic ... has it's own effect for each theme, with some shared if
@@ -500,11 +570,6 @@ do
         return {textures = LEAVES, colors = colors, count = {3, 5}, size = 0.35, spread = 40, drift = drift,
             loop = true}
     end
-    local BURNING_LEAF = {textures = LEAVES, colors = {HELLFIRE, FEL_GREEN}, size = 0.5,
-        overlay = {textures = {T("Flame1")}, colors = {HELLFIRE, FEL_GREEN}, blend = "ADD", size = 0.7,
-            motion = "float"},
-        after = {textures = {T("Embers1")}, colors = {{0.45, 0.42, 0.4}}, size = 0.5, motion = "drip",
-            delay = 0.6}}
     -- Brutal: always gore and wounds. Fire charred blood with embers; frost
     -- frozen blood with an ice shard; nature blood-soaked leaves stuck on
     -- the splat, smearing down; shadow black ichor with a wisp of smoke;
@@ -541,98 +606,116 @@ do
     -- Tame's nature: its rising leaves, and a puff of leaves blowing out and
     -- drifting down.
     tame.styles.nature.accent = BlowingLeaves(tame.styles.nature.colors, "down")
-    -- Spellburst: always its bursts, motes, and rings tinted by school, with
-    -- a flame or ice shard among them for fire and frost, and for nature a
-    -- green burst with a puff of leaves blowing out and up. Physical is
-    -- Brutal's gore with the 18+ box (author: "if I'm a wizard and start
-    -- hitting a mob with my stick and get a crit, I should probably see some
-    -- blood"), else a white impact flash, still in its own language: never
-    -- gore without the box.
-    local flash = Restyle(spellburst, {splats = {T("Burst1"), T("Ring1")}, colors = {{1, 1, 1}},
-        schoolColors = false})
-    spellburst.styles = {
-        physical = function()
-            if DCM.IsAdult() then
-                return brutal
+    -- The variants (see BrutalBase): each school is Brutal's look, in the
+    -- variant's colors for its splats (`colors[kind]`, else Brutal's) and
+    -- its accent (`accents[kind]`, overlay and after too), plus the
+    -- variant's own touch (`extra[kind]` or `extra.all`), and its run.
+    local function Recolor(accent, colors)
+        if not accent or not colors then
+            return accent
+        end
+        local copy = Restyle(accent, {colors = colors})
+        if accent.overlay then
+            copy.overlay = Restyle(accent.overlay, {colors = colors})
+        end
+        if accent.after then
+            copy.after = Restyle(accent.after, {colors = colors})
+        end
+        return copy
+    end
+    local function Variant(theme, spec)
+        local function Style(base, kind)
+            return Restyle(base, {colors = spec.colors and spec.colors[kind], schoolColors = false,
+                schoolPalette = false, accent = Recolor(base.accent, spec.accents and spec.accents[kind]),
+                extraAccent = spec.extra and (spec.extra[kind] or spec.extra.all) or false,
+                run = theme.run, runGrow = theme.runGrow or false, ring = theme.ring or false})
+        end
+        theme.styles = {}
+        for _, kind in ipairs(DCM.SCHOOL_KINDS) do
+            if kind ~= "physical" then
+                theme.styles[kind] = Style(brutal.styles[kind] or brutal, kind)
             end
-            return flash
-        end,
-        fire = Restyle(spellburst, {splats = {T("Burst1"), T("Flame1")}}),
-        frost = Restyle(spellburst, {splats = {T("Burst2"), T("Shard1")}}),
-        nature = Restyle(spellburst, {splats = {T("Burst1")},
-            animations = {[T("Burst1")] = "spin", [T("Maple1")] = "spin", [T("Oak1")] = "spin",
-                [T("Birch1")] = "spin"},
-            accent = BlowingLeaves({{0.55, 1, 0.45}, {0.8, 1, 0.5}}, "up")}),
-    }
-    -- Fel: always its demonic smoke, cracks, and embers; the school picks
-    -- the tint and an accent. Fire hellfire with flame licks; frost icy
-    -- smoke and cracks with rime; nature rot with a leaf that catches fire
-    -- and falls to ash; shadow its purple-black; arcane violet; holy pale.
-    -- Physical is Brutal's gore (Fel is 18+ too). Never a sparkle.
-    local function Dark(colors, fields)
-        fields = fields or {}
-        fields.colors, fields.schoolPalette = colors, false
-        return Restyle(fel, fields)
+        end
+        local plain, beast = Style(brutal, "physical"), Style(brutalBeast, "physical")
+        theme.styles.physical = spec.physical or function(_, crit)
+            return DCM.FeralCrit(crit) and beast or plain
+        end
+        theme.hitStyles = {}
+        for kind, fields in pairs(spec.hits or {}) do
+            theme.hitStyles[kind] = Restyle(DCM.HIT_STYLES[kind], fields)
+        end
     end
-    fel.styles = {
-        physical = brutal,
-        fire = Dark({HELLFIRE, FEL_GREEN}, {accent = Accent("Flame1", {HELLFIRE, FEL_GREEN}, "ADD", "float")}),
-        frost = Dark({{0.5, 0.65, 0.8}, {0.35, 0.45, 0.6}}, {accent = Accent("Shard1", {RIME})}),
-        nature = Dark({{0.35, 0.4, 0.1}, {0.28, 0.32, 0.08}},
-            {runChance = {low = 0.4, medium = 0.5, high = 0.6, max = 0.7}, accent = BURNING_LEAF}),
-        shadow = Dark({SHADOW}),
-        arcane = Dark({{0.55, 0.2, 0.75}}),
-        holy = Dark({{0.85, 0.8, 0.6}}),
-    }
-    -- Naturalist: physical its own claws and bite. The magic schools, "graphic
-    -- and darker" (author): nature "Green 'wrath-like' bursts with insects
-    -- and leaf debris 'poofing' out", murky (drawn, not added light) and
-    -- without a twinkle; arcane "Random Silver bursts (firework-like) that
-    -- fade"; fire charred, burning leaves and embers on a scorched splat;
-    -- frost frozen, blood-flecked leaves with shards on frozen blood; holy
-    -- a harsh searing flare on a scorch; shadow rotting black leaves on
-    -- dark ichor, smearing. No runs for the bursts, fireworks, or scorches.
-    local WOUNDS = {T("Splat1"), T("Splat2"), T("Splat3"), T("Splat4")}
-    local NO_RUNS = {low = 0, medium = 0, high = 0, max = 0}
-    local function Feral(fields)
-        return Restyle(naturalist, fields)
+    -- Spellburst: Brutal's own looks, a glow and a ring in the school's
+    -- color on top, and spell hits 40% denser with a 30% bigger flash.
+    local function Glow(color)
+        return {textures = {T("Burst1"), T("Burst2")}, colors = {color}, blend = "ADD", size = 0.9, onTop = true}
     end
-    -- Its own mix is the beast's (Beast(naturalist) would be the same);
-    -- with the box ticked, anything but a beast's crit is Brutal's
-    -- splatter, drips, and runs.
+    local CHARGED = {emphasis = 1.4, flashScale = 1.3}
+    Variant(spellburst, {
+        extra = {physical = Glow({1, 1, 1}), fire = Glow(FIRE), frost = Glow(ICE), shadow = Glow({0.6, 0.3, 0.95}),
+            arcane = Glow(ARCANE), nature = Glow({0.4, 1, 0.4}), holy = Glow(HOLY_LIGHT)},
+        hits = {fire = CHARGED, frost = CHARGED, shadow = CHARGED, arcane = CHARGED, nature = CHARGED,
+            holy = CHARGED},
+    })
+    -- Fel: every school dark blood, purple, and fel green; its accents too;
+    -- a wisp of dark smoke on each crit; cracks creep from the wounds.
+    local FEL_LIGHT = {FEL_GREEN, {0.6, 0.3, 0.95}}
+    Variant(fel, {
+        colors = {physical = fel.colors, fire = {FEL_DARK, {0.2, 0.5, 0.06}, FEL_DUSK},
+            frost = {{0.3, 0.35, 0.5}, FEL_DUSK}, shadow = {{0.06, 0.04, 0.07}, FEL_DUSK},
+            arcane = {FEL_PURPLE, FEL_DUSK}, nature = {FEL_DARK, {0.2, 0.25, 0.05}},
+            holy = {FEL_DUSK, {0.06, 0.04, 0.07}, FEL_DARK}},
+        accents = {fire = FEL_LIGHT, frost = {{0.7, 0.95, 0.7}, {0.75, 0.65, 1}},
+            nature = {{0.2, 0.3, 0.05}, {0.25, 0.08, 0.3}}, shadow = {{0.06, 0.04, 0.07}, FEL_DUSK},
+            arcane = FEL_LIGHT, holy = FEL_LIGHT},
+        extra = {all = {textures = {T("Smoke1"), T("Smoke2")}, colors = {FEL_DUSK, FEL_DARK}, size = 0.6,
+            motion = "float", onTop = true}},
+        hits = {
+            physical = {colors = {DARK_BLOOD, FEL_DUSK, FEL_DARK}},
+            frost = {colors = {{0.65, 0.95, 0.6}, {0.7, 0.6, 0.95}, {0.85, 1, 0.8}}},
+            fire = {colors = {{0.45, 1, 0.2}, {0.25, 0.85, 0.1}, {0.6, 1, 0.35}},
+                textureColors = {[T("Burst2")] = {0.7, 1, 0.45}}},
+            arcane = {colors = {{0.6, 0.3, 1}, {0.4, 1, 0.3}}},
+            shadow = {colors = {{0.16, 0.32, 0.06}, {0.06, 0.1, 0.03}, FEL_DUSK}},
+            nature = {colors = {{0.35, 0.85, 0.1}, {0.25, 0.5, 0.05}}},
+            -- Holy turns unholy (author: "Holy is no longer a golden
+            -- glow/sparkle. It's now a more evil black/purple/fel-green").
+            holy = {textures = {T("Smoke1"), T("Smoke2"), T("Sparkle1")}, blend = "BLEND",
+                colors = {{0.3, 0.08, 0.45}, FEL_DARK, {0.06, 0.04, 0.07}}, motion = "smoke",
+                flash = {texture = T("Smoke1"), blend = "BLEND", size = 2.6}},
+            heal = {colors = {{0.4, 1, 0.15}, {0.55, 0.3, 0.85}}},
+        },
+    })
+    -- Naturalist: claws for physical (its own mix; with its box, only for a
+    -- beast's crit), earthy tints for the rest, leaves blowing from nature.
+    local MOSS, BARK, AMBER = {0.3, 0.45, 0.1}, {0.3, 0.18, 0.08}, {0.75, 0.5, 0.12}
+    local SILVER = {0.8, 0.83, 0.9}
     naturalist.beast = naturalist
-    naturalist.styles = {
+    Variant(naturalist, {
         physical = function(_, crit)
             if DCM.db and DCM.db.clawsInForm and not DCM.FeralCrit(crit) then
                 return brutal
             end
             return naturalist
         end,
-        nature = Feral({splats = {T("Burst1"), T("Burst2")}, colors = {{0.16, 0.38, 0.08}, {0.24, 0.45, 0.1}},
-            drips = false, runChance = NO_RUNS, animations = {[T("Burst1")] = "spin"},
-            accent = {textures = {T("Insect1"), T("Insect1"), T("Maple1"), T("Oak1"), T("Birch1")},
-                colors = {{0.2, 0.22, 0.08}, {0.3, 0.26, 0.1}, {0.18, 0.3, 0.06}}, count = {4, 6}, size = 0.3,
-                spread = 45, drift = "down", loop = true}}),
-        arcane = Feral({splats = {T("Firework1")}, colors = {{0.85, 0.88, 0.95}, {0.72, 0.76, 0.85}},
-            blend = "ADD", drips = false, runChance = NO_RUNS, animations = {}}),
-        fire = Feral({splats = WOUNDS, colors = {{0.22, 0.05, 0.02}, {0.32, 0.07, 0.02}}, runChance = NO_RUNS,
-            accent = {textures = LEAVES, colors = {{0.16, 0.07, 0.03}, {0.26, 0.09, 0.03}}, count = {1, 2},
-                size = 0.45, onTop = true,
-                overlay = {textures = {T("Flame1")}, colors = {FIRE, FLAME}, blend = "ADD", size = 0.7,
-                    motion = "float"},
-                after = {textures = {T("Embers1")}, colors = {FIRE, FLAME}, blend = "ADD", size = 0.6,
-                    motion = "float", delay = 0.5}}}),
-        frost = Feral({splats = WOUNDS, colors = {{0.42, 0.12, 0.25}, {0.33, 0.16, 0.36}},
-            accent = {textures = LEAVES, colors = {RIME, {0.72, 0.8, 0.9}, {0.85, 0.7, 0.75}}, count = {1, 2},
-                size = 0.5, onTop = true, overlay = {textures = {T("Shard1")}, colors = {ICE}, size = 0.55}}}),
-        holy = Feral({splats = WOUNDS, colors = {{0.3, 0.12, 0.04}}, runChance = NO_RUNS,
-            accent = {textures = {T("Burst1")}, colors = {HOLY_LIGHT, {1, 1, 0.85}}, blend = "ADD", size = 1.1,
-                onTop = true, overlay = {textures = {T("Ring1")}, colors = {{1, 0.95, 0.75}}, blend = "ADD",
-                    size = 1}}}),
-        shadow = Feral({splats = WOUNDS, colors = {{0.08, 0.02, 0.08}, {0.12, 0.04, 0.1}},
-            accent = {textures = LEAVES, colors = {{0.06, 0.05, 0.04}, {0.12, 0.1, 0.06}}, count = {1, 2},
-                size = 0.55, onTop = true, runs = true}}),
-    }
+        colors = {fire = {AMBER, {0.35, 0.12, 0.03}}, frost = {{0.45, 0.55, 0.4}, {0.3, 0.4, 0.3}},
+            shadow = {{0.1, 0.08, 0.03}, {0.18, 0.12, 0.05}}, arcane = {SILVER, {0.5, 0.55, 0.4}},
+            nature = {MOSS, {0.4, 0.6, 0.15}}, holy = {AMBER, {0.85, 0.75, 0.35}}},
+        accents = {fire = {AMBER, {1, 0.7, 0.2}}, frost = {{0.75, 0.9, 0.8}}, nature = {MOSS, BARK},
+            shadow = {BARK, {0.1, 0.1, 0.05}}, arcane = {SILVER}, holy = {AMBER, {1, 0.9, 0.5}}},
+        extra = {nature = BlowingLeaves({MOSS, {0.4, 0.6, 0.15}, BARK}, "down")},
+        hits = {
+            nature = {textures = {T("Maple1"), T("Maple1"), T("Oak1"), T("Birch1"), T("Insect1")},
+                colors = {MOSS, {0.4, 0.6, 0.15}, {0.55, 0.4, 0.12}}, blend = "BLEND", size = 0.5, count = 1.5,
+                motion = "flurry"},
+            fire = {colors = {AMBER, {1, 0.6, 0.15}}, textureColors = {[T("Burst2")] = {1, 0.8, 0.35}}},
+            frost = {colors = {{0.8, 0.95, 0.85}, {0.6, 0.8, 0.7}}},
+            arcane = {textures = {T("Firework1"), T("Sparkle1")}, colors = {SILVER, {0.7, 0.75, 0.85}}},
+            shadow = {colors = {{0.12, 0.1, 0.04}, {0.2, 0.15, 0.06}}},
+            holy = {colors = {AMBER, {1, 0.85, 0.4}}},
+            heal = {colors = {{0.4, 0.85, 0.25}, {0.85, 0.75, 0.3}}},
+        },
+    })
 end
 
 -- Dyre's Sounds, contract 1, else nil.

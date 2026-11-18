@@ -111,6 +111,7 @@ TEXTURE_SPECS = {
     "Vine1.tga": ("vine", 14),
     "Firework1.tga": ("firework", 31),
     "Vignette2.tga": ("lightvignette", 0),
+    "Plus1.tga": ("plus", 0),
 }
 CUTE_KINDS = {"butterfly", "star", "sparkle", "heart"}
 # Spellburst's glows: soft-edged, white, drawn additively and tinted by spell
@@ -123,8 +124,8 @@ FEL_KINDS = {"smoke", "embers", "crack", "vignette"}
 # Shared by the themes' school looks (fire, frost, nature, physical): a soft
 # flame, and white-with-a-rim ice shards, a leaf, a snowflake, and a cartoon
 # "pow" burst, tinted per theme.
-SCHOOL_KINDS = {"flame", "shard", "snowflake", "pow", "maple", "oak", "birch"}
-RIMMED_KINDS = CUTE_KINDS | {"shard", "snowflake", "pow", "maple", "oak", "birch"}
+SCHOOL_KINDS = {"flame", "shard", "snowflake", "pow", "maple", "oak", "birch", "plus"}
+RIMMED_KINDS = CUTE_KINDS | {"shard", "snowflake", "pow", "maple", "oak", "birch", "plus"}
 SOFT_KINDS = SOFT_KINDS | {"flame"}
 # Naturalist's (a mature nature theme): claw rakes and a bite in the blood shading,
 # a beetle and a curling vine white with a rim, a silver firework spray (a
@@ -500,6 +501,15 @@ def heart(seed):
     return shape
 
 
+def plus(seed):
+    """A plump plus sign, white with a rim (a heal landing, tinted green)."""
+    shape = Shape()
+    c = SIZE / 2
+    shape.capsule(c, c - 92, c, c + 92, 30, 30)
+    shape.capsule(c - 92, c, c + 92, c, 30, 30)
+    return shape
+
+
 def sparkle(seed):
     """A four-point twinkle with a smaller one across it and a bright heart."""
     shape = Shape()
@@ -812,7 +822,7 @@ BUILDERS = {"splat": splat, "drip": drip, "run": run, "butterfly": butterfly, "s
             "oak": oak, "birch": birch,
             "burst": burst, "mote": mote, "ring": ring, "smoke": smoke, "embers": embers, "vignette": vignette,
             "crack": crack, "claw": claw, "bite": bite, "insect": insect, "vine": vine, "firework": firework,
-            "lightvignette": lightvignette}
+            "lightvignette": lightvignette, "plus": plus}
 
 
 def glow_pixels(kind, seed, size=SIZE):

@@ -9,6 +9,10 @@ local UNAVAILABLE = "The AddOn settings page is unavailable on this client. Use 
 local THEME_VARIABLE = "DCM_THEME"
 local INTENSITY_VARIABLE = "DCM_INTENSITY"
 local STAY_VARIABLE = "DCM_STAY"
+-- The records rows' tooltip while the client hides damage amounts (WoW:
+-- Forever; author's words).
+DCM.AMOUNTS_BLOCKED = "Presently, WoW Forever blocks addons ability to read damage amounts you do. If they "
+    .. "fix this, we can enable these features again."
 
 local REQUIRED_SETTINGS = {
     "RegisterProxySetting", "CreateCheckbox", "CreateSlider", "CreateSliderOptions", "CreateDropdown",
@@ -76,8 +80,64 @@ end
 
 local function Button(name, text, onClick, tooltip)
     if type(CreateSettingsButtonInitializer) == "function" and layout then
-        layout:AddInitializer(CreateSettingsButtonInitializer(name, text, onClick, tooltip, true))
+        local initializer = CreateSettingsButtonInitializer(name, text, onClick, tooltip, true)
+        layout:AddInitializer(initializer)
+        return initializer
     end
+end
+
+-- A records row while the client hides damage amounts (author: "On Forever,
+-- we should disable the show highest crit stuff, since we can't do it"):
+-- greyed, with the reason as its tooltip. Checkboxes and sliders grey
+-- through Blizzard's modify predicate (SettingsControlMixin:IsEnabled); a
+-- button row does not read it (SettingsButtonControlMixin), so its button is
+-- disabled after each init, and its click does nothing.
+local function Block(initializer)
+    if type(initializer) ~= "table" then
+        return
+    end
+    initializer.data = type(initializer.data) == "table" and initializer.data or {}
+    initializer.data.tooltip = DCM.AMOUNTS_BLOCKED
+    initializer.tooltip = DCM.AMOUNTS_BLOCKED
+    if type(initializer.AddModifyPredicate) == "function" then
+        initializer:AddModifyPredicate(function() return false end)
+    end
+    if initializer.data.buttonClick then
+        initializer.data.buttonClick = function() end
+    end
+    if initializer.onClick then
+        initializer.onClick = function() end
+    end
+    initializer.dcmBlocked = true
+    if type(initializer.InitFrame) == "function" then
+        local initFrame = initializer.InitFrame
+        function initializer:InitFrame(frame)
+            local result = initFrame(self, frame)
+            local button = type(frame) == "table" and frame.Button
+            if type(button) == "table" and type(button.SetEnabled) == "function" then
+                button:SetEnabled(false)
+                if type(frame.DisplayEnabled) == "function" then
+                    frame:DisplayEnabled(false)
+                end
+            end
+            return result
+        end
+    end
+end
+
+-- Runs add(), blocking every row it puts on the layout (the toolkit's
+-- record pop rows too) when blocked.
+local function Blocked(blocked, add)
+    if not blocked or type(layout) ~= "table" then
+        return add()
+    end
+    local addInitializer = layout.AddInitializer
+    layout.AddInitializer = function(self, initializer)
+        Block(initializer)
+        return addInitializer(self, initializer)
+    end
+    add()
+    layout.AddInitializer = addInitializer
 end
 
 local function IntensityLabel(value)
@@ -146,7 +206,7 @@ end
 local function StayLabel(value)
     local percent = DCM.SanitizeStay(value)
     local seconds = DCM.StaySeconds(DCM.Intensity(), percent)
-    if seconds == 0 then
+    if seconds == 0 or DCM.Theme().none then
         return string.format("%d%%", percent)
     end
     return string.format("%d%% (%s)", percent, Seconds(seconds))
@@ -164,9 +224,11 @@ local function StayTimes()
     return table.concat(times, ", ")
 end
 
--- "Brutal (18+)", "Fel (18+)", and "Naturalist (18+)" while the box is clear.
+-- None first (author: "Have it be the first item, above Tame"), then the
+-- themes: each 18+ theme reads "Brutal (18+)" and so on while the box is clear.
 local function ThemeChoices()
     local container = Settings.CreateControlTextContainer()
+    container:Add(DCM.NONE_THEME, DCM.FindTheme(DCM.NONE_THEME).name)
     for _, theme in ipairs(DCM.Themes()) do
         container:Add(theme.key, theme.mature and not DCM.IsAdult() and theme.name .. " (18+)" or theme.name)
     end
@@ -179,7 +241,8 @@ local function AddTheme()
         function() return DCM.IsAdult() end,
         function(value) DCM.SetAdult(value == true) end)
     Settings.CreateCheckbox(category, adult,
-        "Unlocks the Brutal, Fel, and Naturalist themes for every character on this account. Untick it to lock "
+        "Unlocks the Brutal, Spellburst, Fel, and Naturalist themes for every character on this account. Untick "
+            .. "it to lock "
             .. "them again: a character on one goes back to Tame.")
     local setting = Proxy(THEME_VARIABLE, Settings.VarType.String, "Theme", DCM.DEFAULT_THEME,
         function() return DCM.Theme().key end,
@@ -194,13 +257,13 @@ local function AddTheme()
             LaterRefresh()
         end)
     local dropdown = Settings.CreateDropdown(category, setting, ThemeChoices,
-        "What your crits look and sound like. Tame: butterflies, stars, and sparkles in soft pastels, with "
+        "What your crits look and sound like. None: no effects or sounds; your records still count. Tame "
+            .. "(the default): butterflies, stars, and sparkles in soft pastels, with "
             .. "light shimmers. Brutal (18+): heavy flesh impacts, bone crunches, and blood splatter, dripping "
-            .. "at High and Total Mayhem. Spellburst: bursts of light in your spell's school, for casters and "
-            .. "healers; crit heals show too. Fel (18+): dark smoke, falling embers, and creeping cracks in fel "
-            .. "green, shadow, and hellfire. Naturalist (18+): savage claws and bites, wrathful green bursts with "
-            .. "insects and torn leaves, silver fireworks, and burning, frozen, and rotting leaves. More themes "
-            .. "are planned.")
+            .. "at High and Total Mayhem. Spellburst, Fel, and Naturalist (18+) style Brutal for your own "
+            .. "damage (damage on you keeps Brutal's look): Spellburst a glow in your spell's school and brighter "
+            .. "spell hits; Fel dark blood, purple, and fel green for every school, even holy, with cracks and "
+            .. "dark smoke; Naturalist claws and bites, earthy tints, and leaves. More themes are planned.")
     -- Under the theme, live only for a theme that offers it (Tame): Blizzard
     -- re-checks a child row whenever its parent's setting changes.
     local random = Flag("DCM_RANDOM_EFFECTS", "Random Effects", "randomEffects",
@@ -230,9 +293,6 @@ local function AddIntensity()
         function() return DCM.IntensityIndex() end,
         function(value)
             DCM.SetIntensityIndex(math.floor((tonumber(value) or 1) + 0.5))
-            if not DCM.Intensity().splats then
-                DCM.ClearEffects()
-            end
             -- The stay slider's seconds follow the intensity.
             LaterRefresh()
         end)
@@ -241,9 +301,11 @@ local function AddIntensity()
         options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, IntensityLabel)
     end
     Settings.CreateSlider(category, setting, options,
-        "How much your crits show, in your theme: each step is more, bigger, and stays longer. Off: "
-            .. "nothing. Low: one small effect. Medium, High, and Total Mayhem: more of them, bigger, for "
-            .. "longer. Your records count at every intensity.")
+        "How much your crits show, in your theme: each step is more, bigger, and stays longer. Low (the "
+            .. "default): one small effect. Medium, High, and Total Mayhem: more of them, bigger, for "
+            .. "longer. To turn every effect off, pick the None theme. With an 18+ theme (Brutal, Fel, "
+            .. "Naturalist), it also turns up the game's own blood on hit models (its violence level): Low 3, "
+            .. "Medium 4, High and Total Mayhem 5. None, or a cute theme, puts your own level back.")
     local stay = Proxy(STAY_VARIABLE, Settings.VarType.Number, "Stays on screen", DCM.STAY_DEFAULT,
         function() return DCM.db.stay end,
         function(value) DCM.db.stay = DCM.SanitizeStay(value) end)
@@ -260,6 +322,15 @@ local function AddIntensity()
     Flag("DCM_SPLATTER", "On-screen effects", "splatter",
         "The theme's effects on the screen on a crit, under your action bars and unit frames. Never in "
             .. "the middle of the screen for your own crits; at its edges for crits on you.")
+    Flag("DCM_SPRAY", "Hit effects on enemies", "spray",
+        "Every hit that does damage plays its school's effect on the enemy, from its nameplate down over "
+            .. "its body, following it: blood for physical (18+), snow and ice for frost, the body burning "
+            .. "for fire, sparks for arcane and nature, smoke for shadow, golden sparkles for holy, green plus signs "
+            .. "for heals. A crit doubles it. AddOns cannot draw on the mob itself, so this needs enemy "
+            .. "nameplates on. Not in the Tame theme yet.")
+    Flag("DCM_HITS_ON_YOU", "Hit effects on you", "hitsOnYou",
+        "The same effects on your own character when you are hit or healed, in the middle of the screen "
+            .. "where the camera keeps you. Not in the Tame theme yet.")
 end
 
 local function OthersChoices()
@@ -287,7 +358,9 @@ local function AddCrits()
         "Anyone's crits play the effects too: the mob is getting critted, whoever did it. Off: only yours. "
             .. "My target: on the mob you target. Nearby enemies: on your target and every enemy with a "
             .. "nameplate shown. Others' crits are trimmed first so a raid stays readable (one effect each, a "
-            .. "few per half second); yours always play. Never a record or a new record.")
+            .. "few per half second); yours always play. Never a record or a new record. The same setting shows hits "
+            .. "on bystanders (other players, guards, your friendly target): their hit effects on their nameplates, "
+            .. "and their crits as others' crits.")
 end
 
 local function HasSoundRows(library)
@@ -355,26 +428,39 @@ end
 
 local function AddRecords()
     Header("Records")
-    Flag("DCM_ANNOUNCE_SCREEN", "Show new records on screen", "announceScreen",
+    -- The client hides damage amounts (WoW: Forever): no records, so their
+    -- rows are greyed with the reason. "Test crit" stays.
+    local blocked = DCM.AmountsHidden()
+    local rows = {}
+    rows[#rows + 1] = Flag("DCM_ANNOUNCE_SCREEN", "Show new records on screen", "announceScreen",
         "A pop in the middle of the screen for a new record. /dcm unlock (or Dyre's Toolkit's unlock) "
             .. "shows a sample to drag. Your chat always says it, seen only by you.")
-    Flag("DCM_ANNOUNCE_PARTY", "Announce in party", "announceParty",
+    rows[#rows + 1] = Flag("DCM_ANNOUNCE_PARTY", "Announce in party", "announceParty",
         "Say new records in party chat, at most one every 10 seconds.")
-    Flag("DCM_ANNOUNCE_GUILD", "Announce in guild", "announceGuild",
+    rows[#rows + 1] = Flag("DCM_ANNOUNCE_GUILD", "Announce in guild", "announceGuild",
         "Say new records in guild chat, at most one every 10 seconds.")
-    if DCM.popWidget then
-        DCM.toolkit.AddWidgetSettings(category, layout, DCM.popWidget, {
-            labels = {scale = "Record pop size"},
-            tooltips = {scale = "How big the new record pop is, in percent."},
-            resetTooltip = "The record pop back to 100%.",
-        })
-    end
-    Button("Your records", "Show records", function() DCM.ToggleWindow() end,
-        "Every ability's highest hit and crit on this character. /dcm does the same.")
+    -- The toolkit's pop size slider is made through Settings, which adds it
+    -- to this layout too (Blizzard's CreateSlider), so Blocked catches it.
+    Blocked(blocked, function()
+        if DCM.popWidget then
+            DCM.toolkit.AddWidgetSettings(category, layout, DCM.popWidget, {
+                labels = {scale = "Record pop size"},
+                tooltips = {scale = "How big the new record pop is, in percent."},
+                resetTooltip = "The record pop back to 100%.",
+            })
+        end
+        Button("Your records", "Show records", function() DCM.ToggleWindow() end,
+            "Every ability's highest hit and crit on this character. /dcm does the same.")
+    end)
     Button("Try it", "Test crit", function() DCM.TestCrit() end,
         "Plays a crit at this intensity, and a new record's bigger one every third time.")
-    Button("Start over", "Reset records", function() DCM.ConfirmResetRecords() end,
+    rows[#rows + 1] = Button("Start over", "Reset records", function() DCM.ConfirmResetRecords() end,
         "Clears every record on this character, after asking. Out of combat only.")
+    if blocked then
+        for _, initializer in ipairs(rows) do
+            Block(initializer)
+        end
+    end
 end
 
 function DCM.InitializeOptions()

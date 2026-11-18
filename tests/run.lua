@@ -83,8 +83,18 @@ local function fixture(options)
     env.GetTime = function() return state.now end
     env.InCombatLockdown = function() return state.combat end
     env.issecretvalue = function(value) return state.secrets[value] == true end
-    env.SetCVar = function() error("DCM must never change a CVar") end
-    env.C_CVar = {SetCVar = env.SetCVar}
+    -- The one CVar DCM may change is the violence level (state.cvars; nil
+    -- when options.noViolence: a client without it). Any other raises.
+    state.cvars = {violenceLevel = not options.noViolence and (options.violence or "2") or nil}
+    state.cvarSets = {}
+    env.SetCVar = function(name, value)
+        if name ~= "violenceLevel" then error("DCM must never change a CVar but violenceLevel") end
+        if state.combat then error("violenceLevel set in combat") end
+        state.cvars[name] = tostring(value)
+        state.cvarSets[#state.cvarSets + 1] = tostring(value)
+    end
+    env.GetCVar = function(name) return state.cvars[name] end
+    env.C_CVar = {SetCVar = env.SetCVar, GetCVar = env.GetCVar}
     env.UnitGUID = function(unit)
         if unit == "player" then return PLAYER end
         if unit == "pet" then return state.pet end
@@ -421,6 +431,40 @@ local function fixture(options)
     end
     env.UIParent = widget("Frame", "UIParent")
     env.UIParent.width, env.UIParent.height = 1000, 800
+    -- Enemy nameplates: a frame per GUID shown in state.plates (your target's
+    -- only when its GUID has a plate); none with state.noPlates.
+    state.plateFrames = {}
+    -- Distance: state.distance (yards) answers the range probes; nil, no API.
+    -- The client blocks both in combat for a unit you cannot attack.
+    local function guarded(unit)
+        if state.combat and state.friendly and state.friendly[unit] then
+            error("ADDON_ACTION_BLOCKED: range check on a friendly unit in combat")
+        end
+    end
+    env.CheckInteractDistance = function(unit, index)
+        guarded(unit)
+        if not state.distance then return nil end
+        return state.distance <= (index == 3 and 9.9 or index == 2 and 11.11 or 28)
+    end
+    local itemRanges = {[8149] = 5, [15826] = 5, [10645] = 20, [1191] = 20, [835] = 30, [1404] = 30, [4945] = 40,
+        [8348] = 40}
+    env.C_Item = {IsItemInRange = function(item, unit)
+        guarded(unit)
+        if not state.distance or not itemRanges[item] then return nil end
+        return state.distance <= itemRanges[item]
+    end, RequestLoadItemDataByID = function(item) state.loadedItems = (state.loadedItems or 0) + 1 end}
+    env.C_NamePlate = {GetNamePlateForUnit = function(unit)
+        if state.noPlates or not state.plates then return nil end
+        local guid = state.plates[unit]
+        if unit == "target" then
+            for _, plateGUID in pairs(state.plates) do
+                if plateGUID == state.target then guid = state.target end
+            end
+        end
+        if not guid then return nil end
+        state.plateFrames[guid] = state.plateFrames[guid] or widget("Frame", "plate:" .. guid, nil)
+        return state.plateFrames[guid]
+    end}
     env.IsShiftKeyDown = function() return false end
     env.IsControlKeyDown = function() return false end
     local SPOTS = {CENTER = {0.5, 0.5}, BOTTOMLEFT = {0, 0}, TOP = {0.5, 1}, TOPLEFT = {0, 1}, LEFT = {0, 0.5},
@@ -545,10 +589,17 @@ local function fixture(options)
         end
         return list
     end
+    -- What moves: playing loops, and playing runs (the textures splats keep
+    -- as .run; a still splat drawn with a run's texture, Brutal's arcane
+    -- crackle, is not one).
     function state.moving()
+        local runs = {}
+        for _, child in ipairs(state.dcm.overlay and state.dcm.overlay.children or {}) do
+            if child.run then runs[child.run] = true end
+        end
         local count = 0
         for _, group in ipairs(state.groups or {}) do
-            if group.playing and (group.looping or isRun(group.owner.texture or "")) then
+            if group.playing and (group.looping or runs[group.owner]) then
                 count = count + 1
             end
         end
@@ -586,7 +637,7 @@ end
 
 test("login prints the banner from the TOC and the ready hint", function()
     local state = fixture()
-    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.2.1 by Dyre")
+    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.2.2 by Dyre")
     contains(state.messages[2], "Type /dcm for your records")
     equal(#state.messages, 2, "nothing else at login")
 end)
@@ -605,13 +656,64 @@ test("the TOC requires the toolkit, nests under it, and loads the files in order
     end
     equal(table.concat(loads, " "), table.concat(RUNTIME_FILES, " "))
 end)
-test("no runtime file changes a CVar or registers an idle OnUpdate", function()
+test("no runtime file changes a CVar but the violence level, or registers an idle OnUpdate", function()
     for _, path in ipairs(RUNTIME_FILES) do
         local source = assert(io.open(path)):read("*a")
-        equal(source:find("SetCVar", 1, true), nil, path .. " SetCVar")
+        for line in source:gmatch("[^\n]+") do
+            if line:find("SetCVar(", 1, true) then
+                equal(path, "Core.lua", "SetCVar only in Core.lua")
+                contains(line, "SetCVar(VIOLENCE_CVAR, value)")
+            end
+        end
         equal(source:find("\"OnUpdate\"", 1, true), nil, path .. " OnUpdate")
         equal(source:find("pcall", 1, true), nil, path .. " pcall")
     end
+end)
+test("a mature theme turns up the game's violence level by intensity, then puts yours back", function()
+    local state = fixture({violence = "1"})
+    equal(#state.cvarSets, 0, "Tame at Off: untouched at login")
+    state.mayhem("tame", "max")
+    equal(state.cvars.violenceLevel, "1", "a cute theme never changes it")
+    state.mayhem("brutal", "low")
+    equal(state.cvars.violenceLevel, "3")
+    equal(state.env.DyresCritMayhemAccountDB.violenceOwn, "1", "your own level kept")
+    state.mayhem("brutal", "medium")
+    equal(state.cvars.violenceLevel, "4")
+    state.mayhem("brutal", "high")
+    equal(state.cvars.violenceLevel, "5")
+    state.mayhem("brutal", "max")
+    equal(state.cvars.violenceLevel, "5")
+    equal(state.env.DyresCritMayhemAccountDB.violenceOwn, "1", "kept once, never overwritten by DCM's own")
+    state.mayhem("none", "max")
+    equal(state.cvars.violenceLevel, "1", "None: yours back")
+    equal(state.env.DyresCritMayhemAccountDB.violenceOwn, nil)
+    state.mayhem("fel", "high")
+    equal(state.cvars.violenceLevel, "5")
+    state.mayhem("tame", "high")
+    equal(state.cvars.violenceLevel, "1", "a cute theme: yours back")
+    state.mayhem("naturalist", "medium")
+    equal(state.cvars.violenceLevel, "4")
+    state.dcm.SetAdult(false)
+    equal(state.cvars.violenceLevel, "1", "the 18+ box cleared: yours back")
+end)
+test("the violence level waits for combat to end, and is left alone without the CVar", function()
+    local state = fixture()
+    state.combat = true
+    state.mayhem("brutal", "high")
+    equal(state.cvars.violenceLevel, "2", "not in combat")
+    state.combat = false
+    state.emit("PLAYER_REGEN_ENABLED")
+    equal(state.cvars.violenceLevel, "5", "after combat")
+    local bare = fixture({noViolence = true})
+    bare.mayhem("brutal", "max")
+    equal(#bare.cvarSets, 0)
+    equal(bare.env.DyresCritMayhemAccountDB.violenceOwn, nil)
+end)
+test("a saved mature theme sets the violence level at login", function()
+    local state = fixture({violence = "2", db = {theme = "brutal", intensity = "high"},
+        account = {adult = true}})
+    equal(state.cvars.violenceLevel, "5")
+    equal(state.env.DyresCritMayhemAccountDB.violenceOwn, "2")
 end)
 test("commands are one word; others show usage", function()
     local state = fixture()
@@ -619,6 +721,10 @@ test("commands are one word; others show usage", function()
     state.slash("bogus")
     contains(state.last(), "Use /dcm")
     state.slash("test now")
+    contains(state.last(), "Use /dcm test, or /dcm test with one of")
+    state.slash("records now")
+    contains(state.last(), "Use /dcm")
+    state.slash("test fire frost")
     contains(state.last(), "Use /dcm")
 end)
 test("/dcm and /critmayhem toggle the records window", function()
@@ -647,11 +753,11 @@ end)
 
 -- Settings, the theme, and the intensity ---------------------------------------
 
-test("a new character starts on Tame at Off, with only its own crits counting", function()
+test("a new character starts on Tame at Low, with only its own crits counting", function()
     local state = fixture()
     local db = state.db()
     equal(db.theme, "tame")
-    equal(db.intensity, "off")
+    equal(db.intensity, "low")
     equal(db.stay, 100)
     equal(db.mine, true)
     equal(db.pet, false)
@@ -670,7 +776,7 @@ test("damaged saved settings are repaired", function()
         [3] = {name = "Number", hit = 1},
     }, sortKey = "bogus"}, account = {adult = "yes"}})
     local db = state.db()
-    equal(db.intensity, "off")
+    equal(db.intensity, "low")
     equal(db.theme, "tame")
     equal(db.mine, true)
     equal(db.records.Fireball.hit, 120)
@@ -682,9 +788,17 @@ test("damaged saved settings are repaired", function()
     equal(state.env.DyresCritMayhemAccountDB.adult, false)
     equal(fixture({db = {theme = "bogus"}}).db().theme, "tame", "an unknown theme")
 end)
+test("a saved intensity Off becomes the None theme at Low", function()
+    local state = fixture({db = {theme = "brutal", intensity = "off"}, account = {adult = true}})
+    equal(state.db().theme, "none")
+    equal(state.db().intensity, "low")
+    state.spell(PLAYER, ENEMY, "Fireball", 300, true)
+    equal(#state.splats(), 0)
+    equal(#state.sounds, 0)
+end)
 test("earlier test builds' levels become a theme and an intensity", function()
     local cases = {
-        {level = "off", adult = false, theme = "tame", intensity = "off"},
+        {level = "off", adult = false, theme = "none", intensity = "low"},
         {level = "tame", adult = true, theme = "tame", intensity = "low"},
         {level = "fun", adult = true, theme = "brutal", intensity = "low"},
         {level = "spicy", adult = true, theme = "brutal", intensity = "medium"},
@@ -741,15 +855,21 @@ test("the settings page: the 18+ box first, the theme, then the intensity and it
     local labels = {}
     for _, choice in ipairs(theme.choices()) do labels[#labels + 1] = choice.value .. "=" .. choice.label end
     equal(table.concat(labels, ","),
-        "tame=Tame,brutal=Brutal (18+),spellburst=Spellburst,fel=Fel (18+),naturalist=Naturalist (18+)")
+        "none=None,tame=Tame,brutal=Brutal (18+),spellburst=Spellburst (18+),fel=Fel (18+),"
+            .. "naturalist=Naturalist (18+)")
+    equal(theme.setting.default, "tame", "Tame is the default")
+    equal(intensity.setting.default, 1, "Low is the default")
     equal(intensity.options.minValue, 1)
-    equal(intensity.options.maxValue, 5)
+    equal(intensity.options.maxValue, 4)
     local names = {}
-    for value = 1, 5 do names[#names + 1] = intensity.options.formatter(value) end
-    equal(table.concat(names, ","), "Off,Low,Medium,High,Total Mayhem")
-    intensity.setting:SetValue(5)
+    for value = 1, 4 do names[#names + 1] = intensity.options.formatter(value) end
+    equal(table.concat(names, ","), "Low,Medium,High,Total Mayhem", "no Off: None is a theme")
+    intensity.setting:SetValue(4)
     equal(state.db().intensity, "max", "the saved key is unchanged")
     intensity.setting:SetValue(1)
+    theme.setting:SetValue("none")
+    equal(state.db().theme, "none")
+    theme.setting:SetValue("tame")
     state.clear()
     theme.setting:SetValue("brutal")
     equal(theme.setting:GetValue(), "tame", "refused Brutal shows Tame")
@@ -758,11 +878,11 @@ test("the settings page: the 18+ box first, the theme, then the intensity and it
     state.runTimers()
     equal(state.notified[1], "DCM_THEME", "the dropdown redraws")
     adult.setting:SetValue(true)
-    equal(theme.choices()[2].label, "Brutal")
+    equal(theme.choices()[3].label, "Brutal")
     theme.setting:SetValue("brutal")
     equal(theme.setting:GetValue(), "brutal")
-    intensity.setting:SetValue(5)
-    equal(intensity.setting:GetValue(), 5)
+    intensity.setting:SetValue(4)
+    equal(intensity.setting:GetValue(), 4)
     equal(state.db().intensity, "max")
     state.notified = {}
     state.runTimers()
@@ -788,9 +908,9 @@ end)
 
 -- Effects ----------------------------------------------------------------------
 
-test("Off plays nothing, but records and their chat line still count", function()
-    for _, theme in ipairs({"tame", "brutal"}) do
-        local state = fixture({account = {adult = true}, db = {theme = theme}})
+test("None plays nothing at any intensity, but records and their chat line still count", function()
+    for _, intensity in ipairs({"low", "max"}) do
+        local state = fixture({account = {adult = true}, db = {theme = "none", intensity = intensity}})
         state.spell(PLAYER, ENEMY, "Fireball", 300, true)
         state.spell(PLAYER, ENEMY, "Fireball", 400, true)
         equal(#state.sounds, 0)
@@ -799,7 +919,7 @@ test("Off plays nothing, but records and their chat line still count", function(
         contains(state.last(), "New record! Fireball crit 400")
         state.clear()
         state.slash("test")
-        contains(state.last(), "Intensity is Off")
+        contains(state.last(), "Theme is None")
     end
 end)
 test("Tame: pastel butterflies and stars that float up, light sounds, and no blood", function()
@@ -1208,109 +1328,6 @@ end)
 local function firstSplat(state) return state.splats()[1] end
 local function sameColor(color, expected) return color[1] == expected[1] and color[2] == expected[2]
     and color[3] == expected[3] end
-test("Spellburst: bursts of light tinted by spell school, drawn additively", function()
-    local state = fixture()
-    state.mayhem("spellburst", "low")
-    local cases = {
-        {school = 4, color = {1, 0.5, 0.12}, name = "fire", textures = {"Burst1", "Flame1"}},
-        {school = 16, color = {0.45, 0.8, 1}, name = "frost", textures = {"Burst2", "Shard1"}},
-        {school = 64, color = {0.9, 0.45, 1}, name = "arcane"},
-        {school = 32, color = {0.6, 0.3, 0.95}, name = "shadow"},
-        {school = 8, color = {0.4, 1, 0.4}, name = "nature", textures = {"Burst1", "Maple1", "Oak1", "Birch1"}},
-        {school = 2, color = {1, 0.92, 0.6}, name = "holy"},
-        {school = 20, color = {1, 0.5, 0.12}, name = "frostfire reads as fire", textures = {"Burst1", "Flame1"}},
-        {school = 0, color = {0.85, 0.85, 1}, name = "unknown: arcane white"},
-    }
-    for _, case in ipairs(cases) do
-        state.dcm.ClearEffects()
-        state.now = state.now + 1
-        state.spell(PLAYER, ENEMY, "Spell", 100, true, "SPELL_DAMAGE", case.school)
-        local splat = firstSplat(state)
-        equal(sameColor(splat.vertexColor, case.color), true, case.name)
-        equal(splat.blend, "ADD")
-        local known = false
-        for _, name in ipairs(case.textures or {"Burst1", "Burst2"}) do
-            known = known or splat.texture:find(name, 1, true) ~= nil
-        end
-        equal(known, true, case.name .. ": " .. splat.texture)
-    end
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.swing(PLAYER, ENEMY, 50, true)
-    contains(firstSplat(state).texture, "Textures\\", "a melee crit")
-    equal(firstSplat(state).texture:find("Splat", 1, true), nil, "no blood without the 18+ box")
-    local school = secret()
-    state.secrets[school] = true
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.spell(PLAYER, ENEMY, "Spell", 100, true, "SPELL_DAMAGE", school)
-    equal(sameColor(firstSplat(state).vertexColor, {0.85, 0.85, 1}), true, "a secret school: arcane white")
-    -- Back on Brutal, a reused texture blends normally again.
-    state.mayhem("brutal", "low")
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.spell(PLAYER, ENEMY, "Spell", 100, true)
-    equal(firstSplat(state).blend, "BLEND")
-end)
-test("Spellburst: motes rise from Medium, and a ring closes a new record's set and every set from High", function()
-    local state = fixture()
-    state.mayhem("spellburst", "low")
-    state.spell(PLAYER, ENEMY, "Fireball", 100, true, "SPELL_DAMAGE", 4)
-    for _, splat in ipairs(state.splats()) do
-        equal(splat.texture:find("Mote", 1, true) == nil and splat.texture:find("Ring", 1, true) == nil, true,
-            "Low: bursts only")
-    end
-    state.now = state.now + 1
-    state.dcm.ClearEffects()
-    state.spell(PLAYER, ENEMY, "Fireball", 300, true, "SPELL_DAMAGE", 4)
-    local rings = 0
-    for _, splat in ipairs(state.splats()) do
-        if splat.texture:find("Ring1", 1, true) then rings = rings + 1 end
-    end
-    equal(rings, 1, "a new record's ring")
-    state.mayhem("spellburst", "high")
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.spell(PLAYER, ENEMY, "Frostbolt", 100, true, "SPELL_DAMAGE", 16)
-    local motes, ring = 0, 0
-    for _, splat in ipairs(state.splats()) do
-        if splat.texture:find("Mote1", 1, true) then
-            motes = motes + 1
-            local rise
-            for _, animation in ipairs(state.groupsOf(splat)[1].animations) do
-                if animation.kind == "Translation" then rise = animation.offset[2] end
-            end
-            equal(rise > 0, true, "a mote rises")
-        elseif splat.texture:find("Ring1", 1, true) then
-            ring = ring + 1
-        end
-    end
-    equal(motes, 1)
-    equal(ring, 1, "High: a ring every crit")
-    equal(#state.runs(), 0, "no blood runs")
-end)
-test("Spellburst shows crit heals rising in holy or nature light", function()
-    local state = fixture({db = {heals = true}})
-    state.mayhem("spellburst", "low")
-    state.logEvent("SPELL_HEAL", PLAYER, PLAYER, 0, "Flash Heal", 2, 500, 0, 0, true)
-    local splat = firstSplat(state)
-    equal(splat ~= nil, true, "a heal shows")
-    equal(sameColor(splat.vertexColor, {1, 0.92, 0.6}), true, "holy")
-    local rise
-    for _, animation in ipairs(state.groupsOf(splat)[1].animations) do
-        if animation.kind == "Translation" then rise = animation.offset[2] end
-    end
-    equal(rise > 0, true, "rises")
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.logEvent("SPELL_HEAL", PLAYER, PLAYER, 0, "Healing Touch", 8, 500, 0, 0, true)
-    equal(sameColor(firstSplat(state).vertexColor, {0.4, 1, 0.4}), true, "nature")
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.logEvent("SPELL_HEAL", PLAYER, PLAYER, 0, "Drain Life", 32, 50, 0, 0, true)
-    equal(sameColor(firstSplat(state).vertexColor, {1, 0.92, 0.6}), true, "any other heal: holy")
-    contains(firstSplat(state).texture, "Burst", "Spellburst's own look")
-end)
 -- Each theme's heal crit: its heal style's textures and colors, rising.
 local HEALS = {
     tame = {textures = {"Heart1", "Sparkle1", "Butterfly1"}, colors = {{1, 0.6, 0.75}, {1, 0.85, 0.4}}},
@@ -1390,12 +1407,6 @@ test("with Heals too off, heal crits show and sound nothing in any theme", funct
         equal(#state.sounds, 0, theme)
     end
 end)
-test("Spellburst on Forever: the school comes from combat text", function()
-    local state = fixture({restrictCombatLog = true})
-    state.mayhem("spellburst", "low")
-    state.emit("UNIT_COMBAT", "target", "WOUND", "CRITICAL", 300, 16)
-    equal(sameColor(firstSplat(state).vertexColor, {0.45, 0.8, 1}), true, "frost")
-end)
 test("Spellburst's sounds come from Dyre's Sounds' own, in one table", function()
     local state = fixture()
     state.mayhem("spellburst", "medium")
@@ -1413,13 +1424,15 @@ test("Spellburst's sounds come from Dyre's Sounds' own, in one table", function(
 end)
 test("/dcm test runs through the schools", function()
     local state = fixture()
-    state.mayhem("spellburst", "low")
+    state.mayhem("brutal", "low")
     state.slash("test")
-    equal(sameColor(firstSplat(state).vertexColor, {1, 0.5, 0.12}), true, "fire first")
+    local color = firstSplat(state).vertexColor
+    equal(sameColor(color, {0.32, 0.06, 0.02}) or sameColor(color, {0.45, 0.09, 0.02}), true, "fire first: charred")
     state.dcm.ClearEffects()
     state.now = state.now + 1
     state.slash("test")
-    equal(sameColor(firstSplat(state).vertexColor, {0.45, 0.8, 1}), true, "then frost")
+    color = firstSplat(state).vertexColor
+    equal(sameColor(color, {0.42, 0.12, 0.25}) or sameColor(color, {0.33, 0.16, 0.36}), true, "then frost: frozen")
 end)
 local FEL_GREEN, SHADOW, HELLFIRE = {0.35, 0.9, 0.15}, {0.22, 0.08, 0.3}, {0.95, 0.3, 0.08}
 local function felColor(color)
@@ -1445,81 +1458,6 @@ test("Fel is 18+ like Brutal: refused without the box, back to Tame when it is c
         equal(texture:find("Star") or texture:find("Sparkle") or texture:find("Butterfly") or texture:find("Burst")
             or texture:find("Mote"), nil, "no sparkle: " .. texture)
     end
-end)
-test("Fel: shadow crits are shadow, fire crits hellfire or fel, anything else the fel palette", function()
-    local state = fixture()
-    state.mayhem("fel", "low")
-    local function colorOf(school)
-        state.dcm.ClearEffects()
-        state.now = state.now + 1
-        state.spell(PLAYER, ENEMY, "Spell", 100, true, "SPELL_DAMAGE", school)
-        return firstSplat(state).vertexColor
-    end
-    equal(sameColor(colorOf(32), SHADOW), true, "shadow")
-    for _ = 1, 4 do
-        local color = colorOf(4)
-        equal(sameColor(color, HELLFIRE) or sameColor(color, FEL_GREEN), true, "fire")
-    end
-    local shadowflame = colorOf(36)
-    equal(sameColor(shadowflame, HELLFIRE) or sameColor(shadowflame, FEL_GREEN), true,
-        "shadowflame reads as fire (fire comes first)")
-    local frost = colorOf(16)
-    equal(sameColor(frost, {0.5, 0.65, 0.8}) or sameColor(frost, {0.35, 0.45, 0.6}), true, "frost: Fel's icy smoke")
-    local school = secret()
-    state.secrets[school] = true
-    equal(felColor(colorOf(school)), true, "a secret school: the fel palette")
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.spell(PLAYER, ENEMY, "Spell", 100, true, "SPELL_DAMAGE", 0)
-    equal(felColor(firstSplat(state).vertexColor), true, "an unknown school: the fel palette")
-    equal(firstSplat(state).blend, "BLEND", "smoke is dark, not added light")
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.swing(PLAYER, ENEMY, 50, true)
-    local gore = firstSplat(state)
-    equal((gore.texture:find("Splat", 1, true) or gore.texture:find("Drip", 1, true)) ~= nil, true, "melee: gore")
-    equal(sameColor(gore.vertexColor, {0.62, 0.02, 0.02}), true, "Brutal's blood")
-end)
-test("Fel: smoke curls and rises, embers fall from Medium, cracks spread from where it landed", function()
-    local state = fixture()
-    state.mayhem("fel", "medium")
-    state.dcm.random = function(low) if low then return 1 end return 0 end
-    state.spell(PLAYER, ENEMY, "Shadow Bolt", 100, true, "SPELL_DAMAGE", 32)
-    local smoke, embers = 0, 0
-    for _, splat in ipairs(state.splats()) do
-        local main = state.groupsOf(splat)[1]
-        local offset
-        for _, animation in ipairs(main.animations) do
-            if animation.kind == "Translation" then offset = animation.offset[2] end
-        end
-        if splat.texture:find("Embers1", 1, true) then
-            embers = embers + 1
-            equal(offset < 0, true, "embers fall")
-            equal(splat.blend, "ADD", "embers glow")
-        else
-            smoke = smoke + 1
-            equal(offset > 0, true, "smoke rises")
-            local loop
-            for _, group in ipairs(state.groupsOf(splat)) do
-                if group.looping then loop = group end
-            end
-            equal(loop.animations[1].kind, "Rotation", "it curls")
-        end
-    end
-    equal(embers, 1)
-    equal(smoke, 1)
-    local cracks = {}
-    for _, child in ipairs(state.dcm.overlay.children) do
-        if child.shown and (child.texture or ""):find("Crack1", 1, true) then cracks[#cracks + 1] = child end
-    end
-    equal(#cracks, 1, "a crack under the smoke")
-    local point = cracks[1].points[#cracks[1].points]
-    equal(point[1], "CENTER")
-    equal(point[2], state.dcm.overlay, "on the overlay, where the smoke landed")
-    local grow = state.groupsOf(cracks[1])[1].animations[1]
-    equal(grow.origin[1], "CENTER", "spreads from its middle")
-    equal(grow.scaleFrom[1] < 0.1 and grow.scaleFrom[2] < 0.1, true)
-    equal(cracks[1].blend, "BLEND")
 end)
 test("Fel: a new record darkens the screen's edges, then fades slowly", function()
     local state = fixture()
@@ -1596,7 +1534,7 @@ local function gore(style)
 end
 test("nature leaves: maple most, oak, and birch, tumbling; Tame in autumn pastels", function()
     local state = fixture()
-    local tame, spellburst = state.dcm.FindTheme("tame"), state.dcm.FindTheme("spellburst")
+    local tame = state.dcm.FindTheme("tame")
     local counts = {}
     for _, texture in ipairs(state.dcm.CritStyle(tame, 8).splats) do
         local name = texture:match("(%w+)$")
@@ -1609,14 +1547,7 @@ test("nature leaves: maple most, oak, and birch, tumbling; Tame in autumn pastel
     for _, name in ipairs({"Maple1", "Oak1", "Birch1"}) do
         local texture = "Interface\\AddOns\\DyresCritMayhem\\Textures\\" .. name
         equal(style.animations[texture], "spin", name .. " tumbles in Tame")
-        equal(state.dcm.CritStyle(spellburst, 8).animations[texture], "spin", name .. " tumbles in Spellburst")
     end
-    local leaves = {}
-    for _, texture in ipairs(state.dcm.CritStyle(spellburst, 8).accent.textures) do
-        leaves[texture:match("(%w+)$")] = true
-    end
-    equal(leaves.Maple1 and leaves.Oak1 and leaves.Birch1, true, "leaves blow from the green burst")
-    equal(state.dcm.CritStyle(spellburst, 8).splats[1]:match("(%w+)$"), "Burst1", "the green burst")
 end)
 -- The accent's effects: drawn above the set (ARTWORK sublevel 2, an
 -- overlay 3).
@@ -1641,8 +1572,8 @@ end
 local function leaf(texture)
     return texture:find("Maple1", 1, true) or texture:find("Oak1", 1, true) or texture:find("Birch1", 1, true)
 end
-test("nature accents: Tame and Spellburst blow a puff of 3 to 5 tumbling leaves, down and up", function()
-    for _, case in ipairs({{"tame", -1}, {"spellburst", 1}}) do
+test("nature accents: Tame blows a puff of 3 to 5 tumbling leaves, drifting down", function()
+    for _, case in ipairs({{"tame", -1}}) do
         local state = fixture()
         state.mayhem(case[1], "low")
         rolls(state, 0)
@@ -1702,43 +1633,6 @@ test("nature accents: Brutal's blood-soaked leaves stick on the splat and smear 
     for _, splat in ipairs(state.splats()) do
         equal(splat.texture:find("Embers1", 1, true), nil, "no bubbling acid")
     end
-end)
-test("nature accents: Fel's leaf catches fire, then falls to ash; a clear cancels the ash", function()
-    local state = fixture()
-    state.mayhem("fel", "low")
-    rolls(state, 0)
-    state.spell(PLAYER, ENEMY, "Wrath", 100, true, "SPELL_DAMAGE", 8)
-    local burning, flames = accents(state), accents(state, 3)
-    equal(#burning, 1, "one leaf")
-    equal(leaf(burning[1].texture) ~= nil, true, "a leaf")
-    equal(sameColor(burning[1].vertexColor, {0.95, 0.3, 0.08}) or sameColor(burning[1].vertexColor, {0.35, 0.9, 0.15}),
-        true, "hellfire or fel green")
-    equal(#flames, 1, "one flame lick on it")
-    equal(flames[1].texture:find("Flame1", 1, true) ~= nil, true, "a flame")
-    equal(flames[1].blend, "ADD", "it glows")
-    local at, on = burning[1].points[#burning[1].points], flames[1].points[#flames[1].points]
-    equal(at[4] == on[4] and at[5] == on[5], true, "on the leaf")
-    equal(#state.timers, 1, "the ash comes later")
-    local delay = state.timers[1].at - state.now
-    equal(delay > 0 and delay < state.dcm.Intensity().hold, true, "before the leaf fades")
-    state.runTimers()
-    local ash
-    for _, splat in ipairs(accents(state, 3)) do
-        if sameColor(splat.vertexColor, {0.45, 0.42, 0.4}) then ash = splat end
-    end
-    equal(ash ~= nil and ash.texture:find("Embers1", 1, true) ~= nil, true, "grey ash")
-    equal(slideOf(state, ash)[2] < 0, true, "falls")
-    local there = ash.points[#ash.points]
-    equal(there[4] == at[4] and there[5] == at[5], true, "where the leaf burned")
-    for _, splat in ipairs(state.splats()) do
-        equal(splat.texture:find("Sparkle", 1, true), nil, "no sparkles")
-    end
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.spell(PLAYER, ENEMY, "Wrath", 100, true, "SPELL_DAMAGE", 8)
-    state.dcm.ClearEffects()
-    state.runTimers()
-    equal(#state.splats(), 0, "no ash after a clear")
 end)
 test("nature accents keep the caps: splats and moving effects", function()
     for _, key in ipairs({"tame", "spellburst", "brutal", "fel"}) do
@@ -1939,7 +1833,8 @@ test("Naturalist, box clear (the default): claws, bites, and splatter mixed for 
     randomly(druid)
     shift(druid, 24858)
     equal(clawed(druid, function() druid.swing(PLAYER, ENEMY, 50, true) end), true, "Moonkin: claws too")
-    equal(clawed(druid, function() druid.swing(ENEMY, PLAYER, 50, true) end), true, "on you: the mix too")
+    equal(clawed(druid, function() druid.swing(ENEMY, PLAYER, 50, true) end), false,
+        "on you: Brutal's splatter (John: \"effects on me retain the brutal effect\")")
     equal(fixture({db = {clawsInForm = "yes"}}).db().clawsInForm, false, "repaired")
 end)
 test("the Claws only in Cat or Bear form row sits under the theme and is live only on Naturalist", function()
@@ -2004,7 +1899,8 @@ test("Brutal: a Hunter's pet claws; a demon, others' crits, and crits on you spl
         local style = druid.dcm.CritStyle(brutal, mask, {kind = "mine"})
         equal(style, brutal.styles[druid.dcm.SchoolKind(mask)], mask .. ": its school look, unchanged")
     end
-    equal(druid.dcm.CritStyle(druid.dcm.FindTheme("fel"), 1, {kind = "mine"}), brutal, "Fel's melee: Brutal's blood")
+    local felMelee = druid.dcm.CritStyle(druid.dcm.FindTheme("fel"), 1, {kind = "mine"})
+    equal(felMelee.colors, druid.dcm.FindTheme("fel").colors, "Fel's melee: Brutal's look (claws in Cat), in Fel's colors")
 end)
 test("Naturalist's form cache: updated on UPDATE_SHAPESHIFT_FORM, read once per change; secret is no form", function()
     local state = fixture({class = "DRUID"})
@@ -2018,87 +1914,6 @@ test("Naturalist's form cache: updated on UPDATE_SHAPESHIFT_FORM, read once per 
     state.formSecret = true
     shift(state, 768)
     equal(state.dcm.feralForm, false, "a secret form is no form")
-end)
-test("Naturalist nature: a murky green burst with insects and torn leaves poofing out", function()
-    local state = fixture()
-    state.mayhem("naturalist", "low")
-    rolls(state, 0)
-    state.spell(PLAYER, ENEMY, "Wrath", 100, true, "SPELL_DAMAGE", 8)
-    local first = state.splats()[1]
-    equal(first.texture:find("Burst", 1, true) ~= nil, true, "a burst")
-    equal(first.blend, "BLEND", "murky: drawn, not added light")
-    equal(first.vertexColor[2] < 0.5 and first.vertexColor[2] > first.vertexColor[1], true, "dark green")
-    local debris = accents(state)
-    equal(#debris, 4, "the fewest bits on the lowest roll")
-    for _, splat in ipairs(debris) do
-        equal((splat.texture:find("Insect1", 1, true) or leaf(splat.texture)) ~= nil, true, "an insect or a leaf")
-        local offset = slideOf(state, splat)
-        equal(offset[1] ~= 0, true, "poofs outward")
-    end
-    equal(#state.runs(), 0, "no runs")
-    local style = state.dcm.CritStyle(state.dcm.FindTheme("naturalist"), 8)
-    local insects = false
-    for _, texture in ipairs(style.accent.textures) do insects = insects or texture:find("Insect1", 1, true) ~= nil end
-    equal(insects, true, "insects among the debris")
-    equal(style.accent.count[2], 6)
-end)
-test("Naturalist arcane: silver firework sprays that fade, at random spots", function()
-    local state = fixture()
-    state.mayhem("naturalist", "medium")
-    rolls(state, 0)
-    state.spell(PLAYER, ENEMY, "Arcane Missiles", 100, true, "SPELL_DAMAGE", 64)
-    equal(#state.splats() >= 1, true)
-    for _, splat in ipairs(state.splats()) do
-        contains(splat.texture, "Firework1")
-        equal(splat.blend, "ADD", "light")
-        equal(sameColor(splat.vertexColor, {0.85, 0.88, 0.95}) or sameColor(splat.vertexColor, {0.72, 0.76, 0.85}),
-            true, "silver")
-        equal(looping(state, splat), false, "no twinkle")
-    end
-    equal(#state.runs(), 0, "no runs")
-end)
-test("Naturalist fire, frost, holy, shadow: graphic and darker", function()
-    local state = fixture()
-    state.mayhem("naturalist", "low")
-    rolls(state, 0)
-    -- Fire: a scorched splat with a charred leaf burning on it, then embers.
-    state.spell(PLAYER, ENEMY, "Moonfire", 100, true, "SPELL_DAMAGE", 4)
-    local scorch = state.splats()[1]
-    equal(bloody(scorch.texture) ~= nil and scorch.vertexColor[1] < 0.35, true, "a scorched splat")
-    equal(leaf(accents(state)[1].texture) ~= nil, true, "a charred leaf")
-    contains(accents(state, 3)[1].texture, "Flame1")
-    equal(#state.runs(), 0, "a scorch does not run")
-    state.runTimers()
-    local embers = false
-    for _, splat in ipairs(accents(state, 3)) do embers = embers or splat.texture:find("Embers1", 1, true) ~= nil end
-    equal(embers, true, "embers after")
-    -- Frost: rimed leaves with a shard on frozen blood.
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.spell(PLAYER, ENEMY, "Frostbolt", 100, true, "SPELL_DAMAGE", 16)
-    equal(leaf(accents(state)[1].texture) ~= nil, true, "a frozen leaf")
-    contains(accents(state, 3)[1].texture, "Shard1")
-    -- Holy: a harsh searing flare and ring on a scorch.
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.spell(PLAYER, ENEMY, "Smite", 100, true, "SPELL_DAMAGE", 2)
-    local flare = accents(state)[1]
-    contains(flare.texture, "Burst1")
-    equal(flare.blend, "ADD")
-    contains(accents(state, 3)[1].texture, "Ring1")
-    equal(#state.runs(), 0, "no runs")
-    -- Shadow: rotting black leaves on dark ichor, smearing.
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.spell(PLAYER, ENEMY, "Shadow Word: Pain", 100, true, "SPELL_DAMAGE", 32)
-    local rot = accents(state)[1]
-    equal(leaf(rot.texture) ~= nil and rot.vertexColor[1] < 0.15, true, "a black leaf")
-    equal(state.splats()[1].vertexColor[1] < 0.15, true, "dark ichor")
-    equal(#state.runs() >= 1, true, "it smears")
-    for _, name in ipairs(naturalistTextures(state)) do
-        equal(name:find("Star") or name:find("Sparkle") or name:find("Butterfly") or name:find("Heart"), nil,
-            "never whimsical: " .. name)
-    end
 end)
 test("Naturalist's heals: sprouting vines and green and gold smoke, never flowers", function()
     local naturalist = fixture().dcm.FindTheme("naturalist")
@@ -2257,58 +2072,8 @@ test("the Random Effects row sits under the theme and is live only on Tame", fun
     theme.setting:SetValue("tame")
     equal(row.predicate(), true)
 end)
-test("Spellburst: a melee crit is blood only with the 18+ box, else a white flash", function()
-    local state = fixture()
-    state.mayhem("spellburst", "low")
-    local spellburst = state.dcm.FindTheme("spellburst")
-    equal(gore(state.dcm.CritStyle(spellburst, 1)), false, "no box: no gore")
-    state.swing(PLAYER, ENEMY, 50, true)
-    local flash = firstSplat(state)
-    equal((flash.texture:find("Burst1", 1, true) or flash.texture:find("Ring1", 1, true)) ~= nil, true,
-        "Spellburst's own language: " .. flash.texture)
-    equal(sameColor(flash.vertexColor, {1, 1, 1}), true, "a white flash")
-    equal(flash.texture:find("Pow1", 1, true), nil, "not Tame's pow")
-    state.dcm.SetAdult(true)
-    equal(gore(state.dcm.CritStyle(spellburst, 1)), true, "with the box: blood")
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.swing(PLAYER, ENEMY, 50, true)
-    equal(bloody(firstSplat(state).texture) ~= nil, true, "a wizard's stick draws blood")
-    state.dcm.SetAdult(false)
-    state.dcm.ClearEffects()
-    state.now = state.now + 1
-    state.swing(PLAYER, ENEMY, 50, true)
-    equal(bloody(firstSplat(state).texture), nil, "box cleared: no blood again")
-end)
 local MAGIC = {holy = 2, fire = 4, nature = 8, frost = 16, shadow = 32, arcane = 64}
-test("each non-Tame theme keeps its own language for every magic school, with the school's tint", function()
-    local state = fixture({account = {adult = true}})
-    local brutal, fel, spellburst = state.dcm.FindTheme("brutal"), state.dcm.FindTheme("fel"),
-        state.dcm.FindTheme("spellburst")
-    local tints = {}
-    for kind, mask in pairs(MAGIC) do
-        local b = state.dcm.CritStyle(brutal, mask)
-        equal(b.splats, brutal.splats, "Brutal " .. kind .. ": its blood")
-        equal(b.drips, brutal.drips, "Brutal " .. kind .. ": its drips")
-        equal(b.run, brutal.run, "Brutal " .. kind .. ": its runs")
-        tints[#tints + 1] = b.colors[1][1] .. "," .. b.colors[1][2]
-        local f = state.dcm.CritStyle(fel, mask)
-        equal(f.splats, fel.splats, "Fel " .. kind .. ": its smoke")
-        equal(f.run, fel.run, "Fel " .. kind .. ": its cracks")
-        equal(f.drips, fel.drips, "Fel " .. kind .. ": its embers")
-        local sb = state.dcm.CritStyle(spellburst, mask)
-        local burst = false
-        for _, texture in ipairs(sb.splats) do burst = burst or texture:find("Burst", 1, true) ~= nil end
-        equal(burst, true, "Spellburst " .. kind .. ": its bursts")
-        equal(sb.schoolColors, true, "Spellburst " .. kind .. ": tinted by school")
-    end
-    local distinct = {}
-    for _, tint in ipairs(tints) do distinct[tint] = true end
-    local count = 0
-    for _ in pairs(distinct) do count = count + 1 end
-    equal(count >= 5, true, "Brutal's schools are told apart by tint")
-end)
-test("school accents: Brutal's embers, shard, crackle, and flare; Fel's flame licks and rime", function()
+test("school accents: Brutal's embers, shard, crackle, and flare; Fel's the same, in its colors", function()
     local state = fixture()
     local brutal, fel = state.dcm.FindTheme("brutal"), state.dcm.FindTheme("fel")
     local function accent(theme, mask)
@@ -2319,8 +2084,9 @@ test("school accents: Brutal's embers, shard, crackle, and flare; Fel's flame li
     equal(accent(brutal, 16), "Shard1", "frost")
     equal(accent(brutal, 64), "Crack1", "arcane")
     equal(accent(brutal, 2), "Burst1", "holy")
-    equal(accent(fel, 4), "Flame1", "fel fire")
+    equal(accent(fel, 4), "Embers1", "fel fire: Brutal's embers")
     equal(accent(fel, 16), "Shard1", "fel frost")
+    equal(sameColor(state.dcm.CritStyle(fel, 4).accent.colors[1], {0.35, 0.9, 0.15}), true, "in fel green")
     state.mayhem("brutal", "low")
     rolls(state, 0)
     state.spell(PLAYER, ENEMY, "Fiery Weapon", 100, true, "SPELL_DAMAGE", 4)
@@ -2371,11 +2137,10 @@ test("each intensity stays noticeably longer: Low 2.5 s up to Total Mayhem 12 s"
     local dcm = fixture().dcm
     local seconds = {}
     for index, intensity in ipairs(dcm.INTENSITIES) do seconds[index] = dcm.StaySeconds(intensity, 100) end
-    equal(seconds[1], 0, "Off")
-    for index = 3, #seconds do
+    for index = 2, #seconds do
         equal(seconds[index] >= seconds[index - 1] * 1.5, true, dcm.INTENSITIES[index].key .. " stays longer")
     end
-    equal(seconds[2], 2.5)
+    equal(seconds[1], 2.5)
     equal(seconds[#seconds], 12)
 end)
 test("Stays on screen scales the hold and the fade, from 25% to 300%", function()
@@ -2385,7 +2150,9 @@ test("Stays on screen scales the hold and the fade, from 25% to 300%", function(
     equal(slider.options.minValue, 25)
     equal(slider.options.maxValue, 300)
     equal(slider.options.step, 25)
-    equal(slider.options.formatter(100), "100%", "Off has no seconds")
+    equal(slider.options.formatter(100), "100% (2.5 s)", "Low")
+    state.mayhem("none", "low")
+    equal(slider.options.formatter(100), "100%", "None has no seconds")
     contains(slider.tooltip, "Low 2.5 s, Medium 4 s, High 7 s, Total Mayhem 12 s")
     state.mayhem("brutal", "high")
     equal(slider.options.formatter(100), "100% (7 s)")
@@ -2445,7 +2212,7 @@ test("higher intensities splatter more, bigger, and longer", function()
     equal(sizes[1] < sizes[2] and sizes[2] < sizes[3], true, "size grows")
     equal(holds[1] < holds[2] and holds[2] < holds[3], true, "stays longer")
     local levels = fixture().dcm.INTENSITIES
-    equal(levels[5].splats > levels[4].splats and levels[5].hold > levels[4].hold, true, "Total Mayhem is the most")
+    equal(levels[4].splats > levels[3].splats and levels[4].hold > levels[3].hold, true, "Total Mayhem is the most")
 end)
 test("Brutal: from Medium the squelch joins; from High one splatter drips", function()
     local state = fixture()
@@ -2603,7 +2370,7 @@ test("/dcm test plays a crit, and a big one every third time", function()
     local state = fixture()
     state.mayhem("brutal", "low")
     state.slash("test")
-    contains(state.last(), "Test crit: Brutal at Low.")
+    contains(state.last(), "Test crit: fire, Brutal at Low.")
     state.now = state.now + 1
     state.slash("test")
     state.now = state.now + 1
@@ -2684,7 +2451,7 @@ end)
 test("the debug line names the detection path", function()
     local state = fixture()
     state.slash("debug")
-    equal(state.said("detection=combatlog combatLogRestricted=false theme=tame intensity=off adult=false stay=100"),
+    equal(state.said("detection=combatlog combatLogRestricted=false theme=tame intensity=low adult=false stay=100"),
         true)
     contains(state.last(), "debug: since login hits=0 recorded=0 grouped=0")
 end)
@@ -2786,6 +2553,8 @@ test("Forever, solo: hits are matched to your casts for records", function()
     state.cast("player", 2061)
     state.emit("UNIT_COMBAT", "target", "WOUND", "", 70, 2)
     equal(state.db().records["Flash Heal"], nil)
+    state.slash("")
+    contains(state.dcm.window.sorted.text, "Solo guesses from combat text.")
     -- A secret amount plays nothing into the records.
     local amount = secret()
     state.secrets[amount] = true
@@ -2793,8 +2562,120 @@ test("Forever, solo: hits are matched to your casts for records", function()
     state.cast("player", 133)
     state.emit("UNIT_COMBAT", "target", "WOUND", "CRITICAL", amount, 4)
     equal(state.db().records.Fireball.crit, 500)
+end)
+test("Forever with secret amounts: no records, and the window says why", function()
+    local state = fixture({restrictCombatLog = true})
+    state.mayhem("brutal", "low")
+    local hidden = "No records on this client: it hides how much each hit does from AddOns"
+    -- Before any hit, combat text has shown no readable amount.
+    equal(state.dcm.RecordsAvailable(), false)
+    state.slash("records")
+    contains(state.dcm.window.empty.text, hidden)
+    state.slash("records")
+    -- Build 70938: every amount secret, melee and spells alike.
+    for index = 1, 3 do
+        local amount = secret()
+        state.secrets[amount] = true
+        state.now = state.now + 1
+        if index == 3 then state.cast("player", 133) end
+        state.emit("UNIT_COMBAT", "target", "WOUND", "CRITICAL", amount, index == 3 and 4 or 1)
+    end
+    equal(#state.splats() >= 3, true, "the crits still play")
+    equal(next(state.db().records), nil)
+    equal(state.dcm.RecordsAvailable(), false)
+    equal(state.dcm.RecordsGuessed(), false)
+    state.slash("records")
+    contains(state.dcm.window.empty.text, hidden)
+    -- A client that shows amounts again keeps records again.
+    state.now = state.now + 1
+    state.emit("UNIT_COMBAT", "target", "WOUND", "CRITICAL", 200, 1)
+    equal(state.dcm.RecordsAvailable(), true)
+    equal(state.db().records.Melee.crit, 200)
+end)
+test("Forever: /dcm opens the options, and the records rows are greyed with the reason", function()
+    local state = fixture({restrictCombatLog = true})
     state.slash("")
-    contains(state.dcm.window.sorted.text, "Solo guesses from combat text.")
+    equal(state.opened, "id:Crit Mayhem", "the options, not the empty records window")
+    equal(state.dcm.window == nil or not state.dcm.window:IsShown(), true)
+    for _, name in ipairs({"Show new records on screen", "Announce in party", "Announce in guild",
+            "Your records", "Start over"}) do
+        local row = state.row(name)
+        equal(row.dcmBlocked, true, name)
+        equal(row.tooltip, state.dcm.AMOUNTS_BLOCKED, name)
+        contains(row.tooltip, "Presently, WoW Forever blocks addons ability to read damage amounts")
+        if row.modifyPredicates then
+            equal(row.modifyPredicates[1](), false, name .. " greyed")
+        end
+    end
+    state.row("Your records").onClick()
+    equal(state.dcm.window == nil or not state.dcm.window:IsShown(), true, "the greyed button does nothing")
+    equal(state.row("Try it").dcmBlocked, nil, "Test crit stays")
+    -- Classic Era: the records, as before.
+    local era = fixture()
+    era.slash("")
+    equal(era.dcm.window:IsShown(), true)
+    equal(era.row("Your records").dcmBlocked, nil)
+    equal(era.row("Announce in party").dcmBlocked, nil)
+end)
+test("Forever: a wound on a unit you cannot attack is a bystander's: its effects, never yours", function()
+    local state = fixture({restrictCombatLog = true})
+    state.mayhem("brutal", "high")
+    state.plates = {nameplate4 = ENEMY}
+    state.emit("NAME_PLATE_UNIT_ADDED", "nameplate4")
+    state.friendly = {target = true, nameplate4 = true}
+    state.cast("player", 133)
+    state.emit("UNIT_COMBAT", "target", "WOUND", "CRITICAL", 300, 4)
+    state.now = state.now + 1
+    state.emit("UNIT_COMBAT", "nameplate4", "WOUND", "", 100, 1)
+    local function shown()
+        local count = 0
+        for _, child in ipairs(state.dcm.hitLayer.children) do
+            if child.shown then count = count + 1 end
+        end
+        return count
+    end
+    -- High: 5, halved as others' (3); the friendly target has no plate shown.
+    equal(shown(), 3, "the bystander's hit effect plays on its nameplate")
+    equal(#state.splats(), 1, "its crit splatters your screen, as others' crits")
+    equal(next(state.db().records), nil, "no record")
+    equal(state.dcm.RecordCountsText():find("hits=0", 1, true) ~= nil, true, "not counted as your hit")
+    state.dcm.ClearEffects()
+    state.db().othersScope = "target"
+    state.now = state.now + 1
+    state.emit("UNIT_COMBAT", "nameplate4", "WOUND", "", 100, 1)
+    equal(shown(), 0, "My target: not other nameplates")
+    state.db().othersScope = "off"
+    state.now = state.now + 1
+    state.emit("UNIT_COMBAT", "target", "WOUND", "", 100, 1)
+    equal(shown(), 0, "Off: none")
+end)
+test("Era: a mob's hit on another player's nameplate plays its effects, never a record", function()
+    local state = fixture()
+    state.mayhem("brutal", "high")
+    local stranger = "Player-1-STRANGER"
+    state.plates = {nameplate5 = stranger}
+    state.friendly = {nameplate5 = true}
+    state.emit("NAME_PLATE_UNIT_ADDED", "nameplate5")
+    state.swing(ENEMY, stranger, 200, true)
+    local count = 0
+    for _, child in ipairs(state.dcm.hitLayer.children) do
+        if child.shown then
+            count = count + 1
+            equal(child.points[1][2], state.plateFrames[stranger], "on the stranger's nameplate")
+        end
+    end
+    equal(count, 7, "High, halved, a crit doubled, and its burst")
+    equal(#state.splats(), 1, "the crit splatters your screen, as others' crits")
+    equal(next(state.db().records), nil)
+    state.emit("NAME_PLATE_UNIT_REMOVED", "nameplate5")
+    state.dcm.ClearEffects()
+    state.now = state.now + 1
+    state.swing(ENEMY, stranger, 200, false)
+    count = 0
+    for _, child in ipairs(state.dcm.hitLayer.children) do
+        if child.shown then count = count + 1 end
+    end
+    equal(count, 0, "no plate shown: nothing")
 end)
 test("Forever, solo with a pet: its casts are its own, and unmatched physical hits make no record", function()
     local state = fixture({restrictCombatLog = true})
@@ -2808,6 +2689,388 @@ test("Forever, solo with a pet: its casts are its own, and unmatched physical hi
     state.emit("UNIT_COMBAT", "target", "WOUND", "CRITICAL", 90, 4)
     equal(state.db().records["pet:Torment"].crit, 90)
     equal(#state.splats() >= 1, true, "the pet's crit plays with the pet switch")
+end)
+-- Variants of Brutal ------------------------------------------------------------
+
+local function anyColor(color, list)
+    for _, expected in ipairs(list) do
+        if sameColor(color, expected) then return true end
+    end
+    return false
+end
+
+test("a variant styles your damage; damage on you and others' stay Brutal", function()
+    local state = fixture({db = {taken = true}})
+    state.mayhem("fel", "high")
+    rolls(state, 0)
+    local felFire = {{0.14, 0.38, 0.05}, {0.2, 0.5, 0.06}, {0.16, 0.05, 0.22}}
+    local brutalFire = {{0.32, 0.06, 0.02}, {0.45, 0.09, 0.02}}
+    state.spell(PLAYER, ENEMY, "Searing Pain", 200, true, "SPELL_DAMAGE", 4)
+    equal(anyColor(firstSplat(state).vertexColor, felFire), true, "yours: Fel's fire")
+    state.dcm.ClearEffects()
+    state.now = state.now + 1
+    state.spell(ENEMY, PLAYER, "Fireball", 200, true, "SPELL_DAMAGE", 4)
+    equal(anyColor(firstSplat(state).vertexColor, brutalFire), true, "on you: Brutal's")
+    state.dcm.ClearEffects()
+    state.now = state.now + 1
+    state.target = ENEMY
+    state.emit("PLAYER_TARGET_CHANGED")
+    state.spell("Player-1-0042", ENEMY, "Fireball", 200, true, "SPELL_DAMAGE", 4)
+    equal(anyColor(firstSplat(state).vertexColor, brutalFire), true, "others': Brutal's")
+    -- Hit effects: your holy turns unholy smoke; holy on you stays Brutal's sparkles.
+    state.dcm.ClearEffects()
+    state.plates = {nameplate1 = ENEMY}
+    state.emit("NAME_PLATE_UNIT_ADDED", "nameplate1")
+    state.now = state.now + 1
+    state.spell(PLAYER, ENEMY, "Holy Shock", 200, false, "SPELL_DAMAGE", 2)
+    local shown = {}
+    for _, child in ipairs(state.dcm.hitLayer.children) do
+        if child.shown then shown[#shown + 1] = child end
+    end
+    equal(#shown > 0, true)
+    for _, piece in ipairs(shown) do
+        equal(piece.texture:find("Mote1", 1, true), nil, "Fel holy: no golden motes")
+        equal(piece.vertexColor[1] < 0.5, true, "dark, not gold")
+    end
+    state.dcm.ClearEffects()
+    state.now = state.now + 1
+    state.spell(ENEMY, PLAYER, "Holy Fire", 200, false, "SPELL_DAMAGE", 2)
+    for _, child in ipairs(state.dcm.hitLayer.children) do
+        if child.shown then
+            equal(child.vertexColor[1] >= 1, true, "holy on you: Brutal's gold")
+        end
+    end
+    -- Sounds stay the theme's for every crit.
+    equal(state.sounds[#state.sounds].key:find("^fel") ~= nil, true, state.sounds[#state.sounds].key)
+end)
+test("Fel: cracks creep from the wounds, and a wisp of dark smoke rises on each crit", function()
+    local state = fixture()
+    state.mayhem("fel", "low")
+    rolls(state, 0)
+    state.spell(PLAYER, ENEMY, "Shadow Bolt", 200, true, "SPELL_DAMAGE", 32)
+    local cracks = 0
+    for _, run in ipairs(state.runs()) do
+        if run.texture:find("Crack1", 1, true) then cracks = cracks + 1 end
+    end
+    equal(cracks >= 1, true, "cracks")
+    local smoke = 0
+    for _, splat in ipairs(state.splats()) do
+        if splat.texture:find("Smoke", 1, true) then smoke = smoke + 1 end
+    end
+    equal(smoke >= 1, true, "a wisp of smoke")
+end)
+test("Spellburst is 18+ now: its crits glow in the school's color, its spell hits are denser", function()
+    local state = fixture()
+    equal(state.dcm.SetTheme("spellburst").key, "tame", "refused without the box")
+    equal(fixture({db = {theme = "spellburst"}}).db().theme, "tame", "saved without the box: Tame at login")
+    state.mayhem("spellburst", "high")
+    rolls(state, 0)
+    state.spell(PLAYER, ENEMY, "Fireball", 300, true, "SPELL_DAMAGE", 4)
+    local glow = false
+    for _, splat in ipairs(state.splats()) do
+        if splat.texture:find("Burst", 1, true) and splat.blend == "ADD" and sameColor(splat.vertexColor, {1, 0.5, 0.12}) then
+            glow = true
+        end
+        if bloody(splat.texture) then
+            equal(splat.blend, "BLEND", "Brutal's wounds under it")
+        end
+    end
+    equal(glow, true, "a fire glow on the crit")
+    state.dcm.ClearEffects()
+    state.target = ENEMY
+    state.emit("PLAYER_TARGET_CHANGED")
+    state.plates = {nameplate1 = ENEMY}
+    state.emit("NAME_PLATE_UNIT_ADDED", "nameplate1")
+    state.now = state.now + 1
+    state.spell(PLAYER, ENEMY, "Frostbolt", 200, false, "SPELL_DAMAGE", 16)
+    local count = 0
+    for _, child in ipairs(state.dcm.hitLayer.children) do
+        if child.shown then count = count + 1 end
+    end
+    equal(count, math.ceil(5 * 2.5 * 1.4), "High frost, 40% denser")
+end)
+test("Naturalist: earthy tints, leaves blowing from nature crits, and leaves in its nature hits", function()
+    local state = fixture()
+    state.mayhem("naturalist", "low")
+    rolls(state, 0)
+    state.spell(PLAYER, ENEMY, "Wrath", 200, true, "SPELL_DAMAGE", 8)
+    local leaves = 0
+    for _, splat in ipairs(state.splats()) do
+        if leaf(splat.texture) then leaves = leaves + 1 end
+    end
+    equal(leaves >= 3, true, "leaves blow from it")
+    state.dcm.ClearEffects()
+    state.target = ENEMY
+    state.emit("PLAYER_TARGET_CHANGED")
+    state.plates = {nameplate1 = ENEMY}
+    state.emit("NAME_PLATE_UNIT_ADDED", "nameplate1")
+    state.now = state.now + 1
+    state.spell(PLAYER, ENEMY, "Moonfire", 50, false, "SPELL_DAMAGE", 8)
+    for _, child in ipairs(state.dcm.hitLayer.children) do
+        if child.shown then
+            equal(leaf(child.texture) ~= nil or child.texture:find("Insect1", 1, true) ~= nil, true, child.texture)
+        end
+    end
+end)
+
+-- Hit effects on the target --------------------------------------------------
+
+test("/dcm test <type> locks onto one school or a heal; blank rotates", function()
+    local state = fixture()
+    state.mayhem("brutal", "high")
+    for _ = 1, 3 do
+        state.dcm.ClearEffects()
+        state.slash("test FIRE")
+        contains(state.last(), "Test crit: fire, Brutal at High")
+        for _, piece in ipairs(state.dcm.hitLayer.children) do
+            if piece.shown then
+                equal(piece.texture:find("Smoke", 1, true) ~= nil or piece.texture:find("Burst2", 1, true) ~= nil,
+                    true, piece.texture)
+            end
+        end
+    end
+    state.slash("test heal")
+    contains(state.last(), "Test crit: heal")
+    state.slash("test physical")
+    contains(state.last(), "Test crit: physical")
+    local seen = {}
+    for _ = 1, 6 do
+        state.slash("test")
+        seen[state.last():match("Test crit: (%a+)")] = true
+    end
+    for _, name in ipairs({"fire", "frost", "arcane", "shadow", "nature", "holy"}) do
+        equal(seen[name], true, "rotates through " .. name)
+    end
+end)
+
+local function sprays(state)
+    local shown = {}
+    for _, child in ipairs(state.dcm.hitLayer.children) do
+        if child.shown then shown[#shown + 1] = child end
+    end
+    return shown
+end
+
+local function onPlate(state, unit, guid)
+    state.plates = state.plates or {}
+    state.plates[unit] = guid
+    state.emit("NAME_PLATE_UNIT_ADDED", unit)
+end
+
+test("every hit plays its school's effect on the enemy's nameplate; a crit doubles it", function()
+    local state = fixture()
+    state.mayhem("brutal", "low")
+    equal(state.db().spray, true, "on by default")
+    equal(state.db().hitsOnYou, true, "on you too, by default")
+    state.target = ENEMY
+    state.emit("PLAYER_TARGET_CHANGED")
+    onPlate(state, "nameplate1", ENEMY)
+    state.swing(PLAYER, ENEMY, 120, false)
+    local shown = sprays(state)
+    equal(#shown, 2, "Low: two pieces for a plain hit")
+    local plate = state.plateFrames[ENEMY]
+    for _, piece in ipairs(shown) do
+        equal(piece.points[1][2], plate, "anchored to the enemy's nameplate")
+        equal(piece.points[1][5] < 0, true, "under the plate, over the body")
+        contains(piece.texture, "Splat")
+    end
+    equal(#state.splats(), 0, "no screen splatter for a plain hit")
+    state.dcm.ClearEffects()
+    state.now = state.now + 1
+    state.swing(PLAYER, ENEMY, 300, true)
+    local crit = sprays(state)
+    equal(#crit, 5, "a crit doubles it, plus its flash")
+    local flashes = 0
+    for _, piece in ipairs(crit) do
+        if piece.points[1][4] == 0 and piece.width >= 34 * 3.2 * 0.5 - 0.01 then flashes = flashes + 1 end
+    end
+    equal(flashes, 1, "one big blood burst at the impact")
+    equal(#state.splats() >= 1, true, "a crit still splatters the screen")
+    state.dcm.ClearEffects()
+    state.now = state.now + 1
+    state.mayhem("brutal", "max")
+    state.swing(PLAYER, ENEMY, 120, false)
+    equal(#sprays(state), 7, "Total Mayhem: seven")
+end)
+test("hit effects shrink with the enemy's distance, and start well under its nameplate", function()
+    local dcm = fixture().dcm
+    equal(dcm.DistanceScale(nil), 1, "unknown: full size")
+    equal(dcm.DistanceScale(3), 1.15, "1-3 m: a little bigger")
+    equal(dcm.DistanceScale(5), 1.15)
+    equal(dcm.DistanceScale(30), 0.3, "30 yd: much smaller")
+    equal(dcm.DistanceScale(math.huge), 0.22, "past 40 yd")
+    local sizes, drops = {}, {}
+    for _, yards in ipairs({2, 8, 25, 35, 60}) do
+        local state = fixture()
+        equal(state.loadedItems > 0, true, "the probe items are asked for")
+        state.distance = yards
+        state.mayhem("brutal", "high")
+        state.target = ENEMY
+        state.emit("PLAYER_TARGET_CHANGED")
+        onPlate(state, "nameplate1", ENEMY)
+        state.dcm.random = function(low, high) if low then return high or low end return 0.5 end
+        state.swing(PLAYER, ENEMY, 120, false)
+        local piece = sprays(state)[1]
+        sizes[#sizes + 1], drops[#drops + 1] = piece.width, piece.points[1][5]
+    end
+    for index = 2, #sizes do
+        equal(sizes[index] < sizes[index - 1], true, "smaller farther away: " .. index)
+        equal(drops[index] > drops[index - 1], true, "nearer the plate farther away: " .. index)
+    end
+    equal(drops[1] <= -76, true, "76 px or more under the plate up close")
+    -- In combat, a unit you cannot attack is never range-checked (the client
+    -- blocks it): no distance, so full size, and no error.
+    local state = fixture({restrictCombatLog = true})
+    state.distance = 35
+    state.combat = true
+    state.friendly = {nameplate3 = true}
+    equal(state.dcm.UnitDistance("nameplate3"), nil)
+    state.friendly = nil
+    equal(state.dcm.UnitDistance("nameplate3"), 40, "an enemy in combat: measured")
+    equal(sizes[5] / sizes[1] <= 0.22 / 1.15 + 0.01, true, "far: about a fifth of close")
+end)
+test("each school has its own hit effect", function()
+    local cases = {
+        {school = 16, texture = "Snowflake1", alt = "Shard1", also = "Mote1", name = "frost", count = 13},
+        {school = 4, texture = "Smoke", alt = "Burst2", name = "fire"},
+        {school = 64, texture = "Sparkle1", alt = "Mote1", name = "arcane"},
+        {school = 32, texture = "Smoke", alt = "Smoke", name = "shadow"},
+        {school = 2, texture = "Mote1", alt = "Sparkle1", name = "holy"},
+        {school = 8, texture = "Sparkle1", alt = "Mote1", name = "nature", count = 13},
+    }
+    for _, case in ipairs(cases) do
+        local state = fixture()
+        state.mayhem("brutal", "high")
+        state.target = ENEMY
+        state.emit("PLAYER_TARGET_CHANGED")
+        onPlate(state, "nameplate1", ENEMY)
+        state.spell(PLAYER, ENEMY, "Bolt", 200, false, nil, case.school)
+        local shown = sprays(state)
+        equal(#shown, case.count or 5, case.name .. ": High, five (frost: denser)")
+        for _, piece in ipairs(shown) do
+            equal(piece.texture:find(case.texture, 1, true) ~= nil or piece.texture:find(case.alt, 1, true) ~= nil
+                or case.also ~= nil and piece.texture:find(case.also, 1, true) ~= nil,
+                true, case.name .. ": " .. piece.texture)
+        end
+    end
+    -- Fire is a soft glow on the body (author: Immolate's look, not "cartoon
+    -- flame leafs"): added light in fire colors, swelling where it is.
+    local state = fixture()
+    state.mayhem("brutal", "low")
+    state.target = ENEMY
+    state.emit("PLAYER_TARGET_CHANGED")
+    onPlate(state, "nameplate1", ENEMY)
+    state.spell(PLAYER, ENEMY, "Fireball", 200, false, nil, 4)
+    for _, piece in ipairs(sprays(state)) do
+        equal(piece.blend, "ADD", "added light")
+        equal(piece.texture:find("Flame1", 1, true), nil, "no flame shapes")
+        local rise, grow
+        for _, animation in ipairs(state.groupsOf(piece)[1].animations) do
+            if animation.kind == "Translation" then rise = animation.offset[2] end
+            if animation.kind == "Scale" and animation.scaleTo and animation.scaleTo[1] > 1 then grow = animation.scaleTo[1] end
+        end
+        equal(rise >= 6 and rise <= 18, true, "stays on the body")
+        equal(grow, 1.5, "swells")
+    end
+    -- Nature damage over time: the game draws its own poison cloud.
+    state.dcm.ClearEffects()
+    state.now = state.now + 1
+    state.spell(PLAYER, ENEMY, "Serpent Sting", 40, false, "SPELL_PERIODIC_DAMAGE", 8)
+    equal(#sprays(state), 0, "no effect for a nature tick")
+    state.now = state.now + 1
+    state.spell(PLAYER, ENEMY, "Corruption", 40, false, "SPELL_PERIODIC_DAMAGE", 32)
+    equal(#sprays(state), 2, "other ticks play")
+end)
+test("Fel's smoke is green; Tame and None show none", function()
+    local state = fixture()
+    state.target = ENEMY
+    state.emit("PLAYER_TARGET_CHANGED")
+    onPlate(state, "nameplate1", ENEMY)
+    state.mayhem("fel", "low")
+    state.spell(PLAYER, ENEMY, "Shadow Bolt", 200, false, nil, 32)
+    local green = 0
+    for _, piece in ipairs(sprays(state)) do
+        if piece.vertexColor[2] > piece.vertexColor[1] then green = green + 1 end
+    end
+    equal(green >= 1, true, "greenish smoke among the purple")
+    for _, theme in ipairs({"tame", "none"}) do
+        state.dcm.ClearEffects()
+        state.now = state.now + 1
+        state.mayhem(theme, "max")
+        state.swing(PLAYER, ENEMY, 120, true)
+        state.spell(ENEMY, PLAYER, "Fireball", 500, false, nil, 4)
+        equal(#sprays(state), 0, theme)
+    end
+end)
+test("hits and heals on you play over your character; heals are green plus signs", function()
+    local state = fixture()
+    state.mayhem("brutal", "low")
+    state.spell(ENEMY, PLAYER, "Frostbolt", 200, false, nil, 16)
+    local shown = sprays(state)
+    equal(#shown, 5, "Low frost: two, times 2.5")
+    equal(shown[1].points[1][2], state.env.UIParent, "the middle of the screen, where your character is")
+    equal(shown[1].points[1][5] < 0, true, "a little under the middle")
+    state.dcm.ClearEffects()
+    state.now = state.now + 1
+    state.heal(state.env.UnitGUID("party1") or "Player-party", PLAYER, "Heal", 300, true)
+    shown = sprays(state)
+    equal(#shown, 5, "a crit heal: doubled, plus a green glow")
+    for _, piece in ipairs(shown) do
+        equal(piece.texture:find("Plus1", 1, true) ~= nil or piece.texture:find("Burst1", 1, true) ~= nil, true,
+            piece.texture)
+        equal(piece.vertexColor[2] > piece.vertexColor[1], true, "green")
+    end
+    state.dcm.ClearEffects()
+    state.now = state.now + 1
+    state.db().hitsOnYou = false
+    state.spell(ENEMY, PLAYER, "Frostbolt", 200, false, nil, 16)
+    equal(#sprays(state), 0, "the box clear")
+end)
+test("no hit effect without a nameplate, with the box clear, or for a miss", function()
+    local state = fixture()
+    state.mayhem("brutal", "low")
+    state.target = ENEMY
+    state.emit("PLAYER_TARGET_CHANGED")
+    state.swing(PLAYER, ENEMY, 120, true)
+    equal(#sprays(state), 0, "your target has no nameplate shown")
+    onPlate(state, "nameplate1", ENEMY)
+    state.now = state.now + 1
+    state.swing(PLAYER, ENEMY, 0, false)
+    equal(#sprays(state), 0, "nothing landed")
+    state.db().spray = false
+    state.now = state.now + 1
+    state.swing(PLAYER, ENEMY, 120, false)
+    equal(#sprays(state), 0, "the box clear")
+end)
+test("Forever: every wound on a nameplate plays, crits double, and the effects go with the plate", function()
+    local state = fixture({restrictCombatLog = true})
+    state.mayhem("brutal", "medium")
+    onPlate(state, "nameplate2", ENEMY)
+    local amount = secret()
+    state.secrets[amount] = true
+    state.emit("UNIT_COMBAT", "nameplate2", "WOUND", "", amount, 1)
+    equal(#sprays(state), 3, "Medium: three, with a secret amount too")
+    equal(sprays(state)[1].points[1][2], state.plateFrames[ENEMY])
+    state.now = state.now + 1
+    state.emit("UNIT_COMBAT", "nameplate2", "WOUND", "CRITICAL", amount, 16)
+    equal(#sprays(state), 3 + 16 + 1, "a frost crit: three times 2.5, doubled, and its flash")
+    state.emit("NAME_PLATE_UNIT_REMOVED", "nameplate2")
+    equal(#sprays(state), 0, "the plate is reused: its effects go")
+    -- Hits and heals on you.
+    state.now = state.now + 1
+    state.emit("UNIT_COMBAT", "player", "WOUND", "", amount, 4)
+    equal(#sprays(state), 3)
+    state.dcm.ClearEffects()
+    state.now = state.now + 1
+    state.emit("UNIT_COMBAT", "player", "HEAL", "", amount, 2)
+    contains(sprays(state)[1].texture, "Plus1")
+    -- In a group, others' hits play half.
+    state.dcm.ClearEffects()
+    state.group = true
+    onPlate(state, "nameplate2", ENEMY)
+    state.now = state.now + 1
+    state.emit("UNIT_COMBAT", "nameplate2", "WOUND", "", 300, 1)
+    equal(#sprays(state), 2)
 end)
 test("Forever, in a group: crits on your target and enemy nameplates play by the setting, never a record",
         function()
@@ -2825,7 +3088,7 @@ test("Forever, in a group: crits on your target and enemy nameplates play by the
     state.friendly = {nameplate5 = true}
     state.emit("UNIT_COMBAT", "nameplate5", "WOUND", "CRITICAL", 320, 4)
     state.emit("UNIT_COMBAT", "focus", "WOUND", "CRITICAL", 330, 4)
-    equal(#state.splats(), 2, "not a friendly nameplate, not focus")
+    equal(#state.splats(), 3, "a friendly nameplate is a bystander's crit (John); never focus")
     state.now = state.now + 1
     state.cast("player", 133)
     state.emit("UNIT_COMBAT", "target", "WOUND", "CRITICAL", 900, 4)
@@ -2888,30 +3151,31 @@ test("Era: groupmates' crits on your target and nearby enemies play by the setti
     state.now = state.now + 1
     state.spell(MATE, NEAR, "Mortal Strike", 900, true, "SPELL_DAMAGE", 1)
     equal(#state.splats(), 2, "nameplate gone")
-    -- A friendly nameplate never counts.
+    -- A friendly nameplate is a bystander's: its crit plays as others' (John:
+    -- "put the crit splatter from other's crits back"), never a record.
     state.friendly = {nameplate3 = true}
     state.plates.nameplate3 = "Player-1-0043"
     state.emit("NAME_PLATE_UNIT_ADDED", "nameplate3")
     state.spell(MATE, "Player-1-0043", "Mortal Strike", 900, true, "SPELL_DAMAGE", 1)
-    equal(#state.splats(), 2, "a friendly nameplate")
+    equal(#state.splats(), 3, "a friendly nameplate: a bystander's crit")
     -- My target only.
     state.emit("NAME_PLATE_UNIT_ADDED", "nameplate2")
     state.db().othersScope = "target"
     state.now = state.now + 1
     state.spell(MATE, NEAR, "Mortal Strike", 900, true, "SPELL_DAMAGE", 1)
-    equal(#state.splats(), 2, "My target: not a nearby enemy")
+    equal(#state.splats(), 3, "My target: not a nearby enemy")
     state.spell(MATE, ENEMY, "Mortal Strike", 900, true, "SPELL_DAMAGE", 1)
-    equal(#state.splats(), 3, "My target: the target")
+    equal(#state.splats(), 4, "My target: the target")
     -- Off.
     state.db().othersScope = "off"
     state.now = state.now + 1
     state.spell(MATE, ENEMY, "Mortal Strike", 900, true, "SPELL_DAMAGE", 1)
-    equal(#state.splats(), 3, "Off: nothing")
+    equal(#state.splats(), 4, "Off: nothing")
     -- Your own crit is yours, with its record, whatever the setting.
     state.now = state.now + 1
     state.spell(PLAYER, FAR, "Fireball", 300, true)
     equal(state.db().records.Fireball.crit, 300)
-    equal(#state.splats() > 3, true)
+    equal(#state.splats() > 4, true)
 end)
 test("others' crits are trimmed: a few per half second, one still effect each, and yours always play", function()
     local state = fixture()

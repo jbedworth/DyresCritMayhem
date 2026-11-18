@@ -4,8 +4,10 @@ Dial up the mayhem on your crits. **Dyre's Crit Mayhem** plays sounds and
 splatters blood on your screen when you crit, as much as you choose, and keeps
 your personal records: each ability's highest hit and highest crit.
 
-It starts **Off**: every effect off until you turn it up. It never changes
-your game settings (violence level, volume, or sound).
+It starts on **Tame** at **Low**: small, cute effects. Pick the **None**
+theme to turn every effect off. It never changes
+your volume or sound. The one game setting it changes is the violence level,
+and only with an 18+ theme turned up (see Intensity).
 
 For World of Warcraft Classic Era and Anniversary. WoW: Forever support is
 built but unconfirmed until Forever launches (see Compatibility).
@@ -23,41 +25,39 @@ built but unconfirmed until Forever launches (see Compatibility).
     bites, and splatter instead. Brutal
     is locked until you tick **I'm 18 or over** (once, for your whole
     account); untick it and those characters go back to Tame.
-  - **Spellburst**, for casters and healers: bursts of light in your
-    spell's school (fire orange, frost blue, arcane violet, shadow purple,
-    nature green, holy gold, melee white), glowing motes that rise from
-    Medium, and a ring of light from High and for a new record. Crit heals
-    show too, rising in holy or nature light.
-  - **Fel** (18+, like Brutal), dark and demonic: smoke that curls
-    as it rises, embers falling from Medium, cracks creeping out from where
-    it landed, and a dark shadow around the screen for a new record. Fel
-    green, shadow, and hellfire: shadow crits are shadow, fire crits
-    hellfire or fel. No sparkles.
-  - **Naturalist** (18+, like Brutal and Fel), for Druids and nature, savage and
-    a touch gory: melee crits mix claw scratches, bites, and splatter at
-    any angle, some dripping straight down (or, with **Claws only in Cat
-    or Bear form** ticked under the theme, only in those forms and for a
-    Hunter's pet, Brutal's splatter otherwise); nature crits a murky green burst with insects
-    and torn leaves bursting out; arcane silver fireworks; fire, frost,
-    holy, and shadow burning, frozen, seared, and rotting looks. Crit heals
-    sprout vines and green and gold smoke; a new record darkens the
-    screen's edges in deep green. Growls and roars.
+  - **Spellburst**, **Fel**, and **Naturalist** are styles of Brutal: the
+    same blood, drips, and hit effects, but your own damage takes on the
+    theme's character. Damage on you and other people's damage keep
+    Brutal's plain look. Each is 18+, like Brutal, and keeps its own sounds.
+    - **Spellburst**, for casters and healers: a glow in your spell's
+      school color on every crit, and stronger, brighter spell hits.
+    - **Fel**, dark and demonic: every school turns to dark blood, purple,
+      and fel green, with cracks creeping from the wounds and a wisp of dark
+      smoke on each crit. Even holy goes black, purple, and green: a
+      Paladin on Fel is a shadowknight. A new record darkens the screen's
+      edges. Wet smashes, mud splats, a heartbeat, and a demon growl.
+    - **Naturalist**, for Druids and nature: melee crits mix claw
+      scratches, bites, and splatter (or, with **Claws only in Cat or Bear
+      form** ticked under the theme, only in those forms and for a Hunter's
+      pet); the other schools take earthy tints (moss, bark, amber,
+      silver), and nature crits throw leaves. Crit heals sprout vines and
+      green and gold smoke; a new record darkens the screen's edges in deep
+      green. Growls and roars.
   - More themes are planned.
-- **By damage school**: each theme keeps its own look, and a crit's school
-  adds a color and a small touch: Brutal's wounds are charred with embers,
-  frozen with an ice shard, stuck with blood-soaked leaves, black ichor,
-  crackling violet, or seared with a flare; Fel's smoke gets hellfire
-  flame licks, rime, burning leaves that fall to ash, violet, or pale
-  light; Spellburst's bursts are colored by school with a flame, ice
-  shard, or a puff of leaves. Melee crits are blood in every theme
-  but Tame (on Spellburst only with the 18+ box, else a white flash).
-  Tame's are cartoon looks, never blood (or tick **Random Effects**, under
-  the theme, for its stars, butterflies, and sparkles on every crit). A
-  spell of two schools shows one, magic first: fire, frost, shadow,
-  arcane, nature, holy. `artwork/style-matrix-preview.png` shows them all.
-- **Intensity**: Off (the default), Low, Medium, High, and Total Mayhem, for any
-  theme. Each step is more, bigger, and stays longer: about 2.5 seconds at
-  Low up to 12 at Total Mayhem.
+- **By damage school**: Brutal's wounds are charred with embers, frozen
+  with an ice shard, stuck with blood-soaked leaves, black ichor, crackling
+  violet, or seared with a flare; the styles recolor the same looks. Tame's
+  are cartoon looks, never blood (or tick **Random Effects**, under the
+  theme, for its stars, butterflies, and sparkles on every crit). A spell
+  of two schools shows one, magic first: fire, frost, shadow, arcane,
+  nature, holy. `artwork/style-matrix-preview.png` shows them all.
+- **Intensity**: Low (the default), Medium, High, and Total Mayhem, for any
+  theme. To turn every effect off, pick the **None** theme, the first in the
+  Theme list. Each step is more, bigger, and stays longer: about 2.5 seconds at
+  Low up to 12 at Total Mayhem. With an 18+ theme (Brutal, Spellburst, Fel, Naturalist)
+  it also turns up the game's own blood on hit models, its violence level:
+  Low 3, Medium 4, High and Total Mayhem 5. None, a cute theme, or clearing
+  the 18+ box puts your own level back.
 - **Stays on screen**, right under it: 25% to 300% of your intensity's time,
   to tune how long without changing the intensity. It shows the seconds.
 - **Which crits**: yours (on by default), **others' crits** (Off, My
@@ -66,10 +66,24 @@ built but unconfirmed until Forever launches (see Compatibility).
   and records stay yours), your pet's, crits on you
   (their blood lands at the edges of the screen), and crit heals: a sound and
   gentle rising light in your theme's style (hearts on Tame, warm red and
-  gold on Brutal, never blood, fel-green wisps on Fel, vines and green and
-  gold smoke on Naturalist).
+  gold on Brutal, never blood, holy and nature light on Spellburst, fel-green
+  wisps on Fel, vines and green and gold smoke on Naturalist).
 - Effects land under your action bars and unit frames, and your own crits
   never cover the middle of the screen. **On-screen effects** has a switch.
+- **Hit effects on enemies** (on by default): every hit that does damage,
+  damage over time too, plays its school's effect on the enemy, from its
+  nameplate down over its body, following it: a blood spray for physical
+  (18+), snow and ice for frost, the body burning for fire, sparks for
+  arcane and nature, smoke for shadow, golden sparkles for holy, and green
+  plus signs for heals, in your theme's style for your own damage. A crit
+  doubles it. The game draws its own green cloud on a poisoned mob, so
+  nature damage over time adds nothing. AddOns cannot draw on the mob
+  itself, so this needs enemy nameplates on (V). Not in Tame yet.
+- **Hit effects on you** (on by default): the same when you are hit or
+  healed, over your character in the middle of the screen.
+- Hits on bystanders (other players, guards, your friendly target) play
+  their hit effects on their nameplates too, and their crits splatter
+  your screen as others' crits, by **Others' crits**; never a record.
 - **Sounds**: each theme has 2-3 sounds for a crit, a new record, and an
   extra (Brutal's squelch), one picked at random each time (Brutal's gore
   impacts and wet splats; Tame's kisses, swishes, and shimmers). Tick "my
@@ -82,7 +96,7 @@ built but unconfirmed until Forever launches (see Compatibility).
 ## Personal records
 
 - Every ability's highest hit and highest crit on this character, yours and
-  your pet's (and heals, with **Heals too**), at every intensity, Off included.
+  your pet's (and heals, with **Heals too**), in every theme, None included.
 - A new record always says so in your chat, seen only by you. You can also
   announce it in **party**, in **guild** (at most one every 10 seconds), and
   **on screen** with a pop you can place.
@@ -94,7 +108,9 @@ built but unconfirmed until Forever launches (see Compatibility).
 
 - `/dcm`: your records. `/dcm options`: the settings (also under Options >
   AddOns > Dyre's AddOns > Crit Mayhem).
-- `/dcm test`: a crit at your intensity (every third one as a new record).
+- `/dcm test`: a crit at your intensity (every third one as a new record),
+  each one a different school. `/dcm test fire` (or frost, arcane, shadow,
+  nature, holy, physical, heal) plays only that one.
 - `/dcm unlock` and `/dcm lock`: move the record pop (with all of Dyre's
   AddOns' frames); `/dcm reset` puts the pop back.
 - `/dcm resetrecords`, and `/dcm debug` for diagnostics. `/dcm probe` logs
@@ -118,9 +134,11 @@ The CurseForge app installs both with it.
   the game's combat text instead. Your crits are detected on your target,
   your focus, and nameplates: best solo, where every crit on an enemy is
   yours or your pet's. In a group, any crit on your target or an enemy
-  nameplate plays as others' crits. Records are kept solo, as best guesses:
-  each hit is matched to your last cast. Crits on you and crit heals on you work too.
-  Not yet confirmed in the client: `/dcm probe` checks it.
+  nameplate plays as others' crits. Crits on you and crit heals on you work
+  too. **No records on Forever**: it hides how much each hit does from
+  AddOns, so DCM cannot tell a highest hit or crit. There the Records
+  settings are greyed (their tooltip says why), and `/dcm` opens the
+  settings; `/dcm records` shows the records window, which says so.
 
 Verified in client: nothing yet (0.1.0 is in development).
 

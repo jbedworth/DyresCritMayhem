@@ -1,8 +1,8 @@
 -- Prints every theme's style for every damage school kind, from Themes.lua
 -- itself, for scripts/build_matrix_preview.py. Run from the repository root:
 --   lua5.1 scripts/style_matrix.lua [adult]
--- One line per drawn texture: theme kind texture r g b blend (adult or not
--- decides Spellburst's physical look).
+-- One line per drawn texture: theme kind texture r g b blend (a variant's
+-- own touch, then its school accent, second).
 local adult = arg and arg[1] == "adult"
 -- "feral": your crits as in Cat or Bear form (Naturalist's claws).
 local feral = arg and arg[1] == "feral"
@@ -24,10 +24,13 @@ for _, theme in ipairs(DCM.Themes()) do
         local textures = {}
         for _, texture in ipairs(style.splats) do textures[#textures + 1] = texture end
         local accentColors = {}
-        if style.accent then
-            local accent = style.accent.textures[1]
-            table.insert(textures, 2, accent)
-            accentColors[accent] = style.accent
+        -- A variant's own touch shows before Brutal's school accent.
+        for _, extra in ipairs({style.accent or false, style.extraAccent or false}) do
+            if extra then
+                local accent = extra.textures[1]
+                table.insert(textures, 2, accent)
+                accentColors[accent] = extra
+            end
         end
         for _, texture in ipairs(textures) do
             if not seen[texture] then

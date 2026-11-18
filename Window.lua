@@ -40,6 +40,8 @@ local GUESSED_EMPTY = "No records yet. On this client they come from combat text
     .. "something!"
 local UNAVAILABLE = "Records need the combat log, which this client keeps from AddOns. The crit effects "
     .. "still play."
+local HIDDEN = "No records on this client: it hides how much each hit does from AddOns, so DCM cannot tell "
+    .. "a highest crit. The crit effects still play."
 
 local window
 local rows = {}
@@ -185,7 +187,7 @@ function DCM.RefreshWindow()
     end
     window.list:SetHeight(math.max(1, #list * ROW_HEIGHT))
     if #list == 0 then
-        window.empty:SetText(not DCM.RecordsAvailable() and UNAVAILABLE
+        window.empty:SetText(DCM.AmountsHidden() and HIDDEN or not DCM.RecordsAvailable() and UNAVAILABLE
             or DCM.RecordsGuessed() and GUESSED_EMPTY or EMPTY)
         window.empty:Show()
     else

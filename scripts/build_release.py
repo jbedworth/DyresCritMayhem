@@ -39,7 +39,7 @@ MEDIA_FILES = ("Textures/Splat1.tga", "Textures/Splat2.tga", "Textures/Splat3.tg
                "Textures/Snowflake1.tga", "Textures/Pow1.tga", "Textures/Rainbow1.tga",
                "Textures/Maple1.tga", "Textures/Oak1.tga", "Textures/Birch1.tga", "Textures/Claw1.tga",
                "Textures/Claw2.tga", "Textures/Claw3.tga", "Textures/Bite1.tga", "Textures/Insect1.tga", "Textures/Vine1.tga",
-               "Textures/Firework1.tga", "Textures/Vignette2.tga")
+               "Textures/Firework1.tga", "Textures/Vignette2.tga", "Textures/Plus1.tga")
 PACKAGE_FILES = TEXT_FILES + MEDIA_FILES
 TGA_HEADER_SIZE = 18
 TGA_RLE_TRUECOLOR = 10
@@ -306,7 +306,7 @@ def _release_notes(version, changes):
 ## Notes
 
 - Opt-in mayhem for your crits, as much as you dial up: an intensity from
-  Off (the default) to Total Mayhem, staying longer each step, with a "Stays on
+  Low (the default) to Total Mayhem, staying longer each step, with a "Stays on
   screen" slider, in a theme: Tame (pastel butterflies and stars, the
   default) or Brutal (blood splatter; 18+, locked until you tick "I'm 18 or
   over"). More themes to come.

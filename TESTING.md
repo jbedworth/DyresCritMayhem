@@ -16,7 +16,8 @@ positions), `UNIT_COMBAT`, Settings, frames, AnimationGroups, chat, popups,
 Dyre's Sounds, and the real Dyre's Toolkit files: from ../DyresToolkit when
 that checkout exists, else from the vendored tests/toolkit copy (as in CI).
 No test checks that the copy matches the checkout. Its
-`SetCVar` raises, and registering the combat log raises when the fixture
+`SetCVar` raises for any CVar but `violenceLevel` (and for that one in
+combat), and registering the combat log raises when the fixture
 restricts it, as Forever does. Mocks cannot show how the effects look, the
 real sounds, layout, taint, or secret values; those need the client.
 
@@ -46,12 +47,15 @@ in, and BugSack on to catch errors.
 
 1. **Login**: `DCM: Dyre's Crit Mayhem 0.2.0 by Dyre` and the ready line; no
    errors. `/dcm debug` says `detection=combatlog combatLogRestricted=false
-   theme=tame intensity=off adult=false stay=100`.
-2. **Off**: fight something. No sound, nothing on screen. `/dcm` lists your
-   abilities' highest hit and crit anyway, and beating one says so in chat.
+   theme=tame intensity=low adult=false stay=100`.
+2. **None**: pick the None theme, then fight something. No sound, nothing
+   on screen, no hit effects. `/dcm` lists your abilities' highest hit and crit
+   anyway, and beating one says so in chat. `/dcm test` says the theme is
+   None. A character saved at Off in 0.2.1 logs in on None at Low.
 3. **Settings**: Options > AddOns > Dyre's AddOns > Crit Mayhem. From the
-   top: I'm 18 or over, Theme (Tame, "Brutal (18+)"), Intensity (Off, Low,
-   Medium, High, Total Mayhem), and Stays on screen (100% with a gold mark). Choose
+   top: I'm 18 or over, Theme (None first, then Tame, the default,
+   and "Brutal (18+)"), Intensity (Low, the default,
+   Medium, High, Total Mayhem; no Off), and Stays on screen (100% with a gold mark). Choose
    Brutal: chat says it is for 18 and over and the theme stays Tame. Tick
    "I'm 18 or over": Brutal works. Untick it: back to Tame, with a line.
 4. **Effects** at each intensity with `/dcm test`, then real crits, on both
@@ -79,73 +83,42 @@ in, and BugSack on to catch errors.
      splat for a new record, and a wet splat or punch from Medium; Tame a
      kiss, swish, or shimmer, and kisses or a rising chime for a record.
    - An area spell critting many targets doesn't flood the screen.
-5. **Spellburst** (a Mage or Warlock, then a Priest):
-   - A new character of any class starts on Tame; pick Spellburst in the
-     Theme dropdown.
-   - `/dcm test` runs through fire, frost, arcane, shadow, nature, and holy
-     colors. Real crits: Fireball orange, Frostbolt blue, Shadow Bolt
-     purple, Arcane Missiles violet; melee white. The bursts glow (added
-     light) rather than cover the screen.
-   - From Medium a mote rises with each crit; from High a ring of light
-     closes each set, and a new record gets one at any intensity.
-   - Priest with "Heals too": a crit Flash Heal shows gold light rising; a
-     Druid's Healing Touch green.
-   - The extra sound (any theme that has one) joins only about 3 crits in
-     10, from its intensity.
-   - Sounds on Era: Magical disappear or Fading slow disappear per crit,
-     Disappear blow swoosh for a record, Teleport warp vanish or
-     Disappearing swoosh from Medium (the game's kit sounds in the set play
-     only where the client can, not on Era). None silent.
-6. **Fel** (a Warlock):
-   - With "I'm 18 or over" clear, the dropdown reads "Fel (18+)" and
-     choosing it says it is for 18 and over. Tick the box: Fel works. Clear
-     it: back to Tame, with a line. A new character still starts on Tame.
-   - Shadow Bolt and Corruption crits: purple-black smoke that turns slowly
-     as it rises and dissolves; Immolate or Searing Pain: hellfire red or
-     fel green; melee or the pet's: the mix. No sparkles or stars.
-   - From Medium an ember or two falls with each crit; now and then cracks
-     creep out under the smoke where it landed and fade with it.
-   - A new record: the screen's edges darken and fade slowly (longer with
-     "Stays on screen" up).
-   - Sounds on Era (Dyre's Sounds 1.4.0): Fel Sounds' Wet smash, Mud
-     splat, or Heartbeat per crit; Demon growl for a record; from Medium a
-     Heartbeat now and then after a smash or splat, never two heartbeats
-     at once. None silent. With Dyre's Sounds 1.3.0: Gore: Bash or Chop,
-     Big monster roar or Monster bear, Orc spitting fury.
-6a. **Naturalist** (a Druid; full client restart: seven new textures):
-   - With "I'm 18 or over" clear, the dropdown reads "Naturalist (18+)" and
-     choosing it says it is for 18 and over. Tick the box: Naturalist works.
-     Clear it: back to Tame, with a line. A new character starts on Tame.
-   - Cat or Bear form (Claw, Rake, Maul, Swipe, white swings): a mix of
-     claw scratches (two, three, or four lines), bite marks, and blood
-     splatter, each at its own angle and size, never all alike; now and
-     then one grows a trickle that runs straight down the screen, however
-     the mark is turned. From High a dripping one too.
-   - "Claws only in Cat or Bear form" sits under the Theme, greyed except
-     on Naturalist, clear by default. Clear: caster form with a mace, and
-     a Warrior on Naturalist, still mix claws, bites, and splatter.
-   - Tick it: out of form (caster form with a mace or staff, Moonkin,
-     Travel, Aquatic), a Warrior, crits on you, and others' crits are
-     Brutal's blood splatter only, with its drips and runs. Shift back to
-     Cat: claws again on the next crit. A Hunter's pet ("Pet's crits" on)
-     claws and bites; a Warlock's demon splatters.
-   - Brutal (no box): a Druid in Cat or Bear form gets claws, bites, and
-     splatter in Brutal's red; in caster form, and a Warrior, Brutal's
-     splatter as before. A Hunter's pet claws. Spells look as before.
-   - Wrath: a murky dark-green burst (no glow, no twinkle) with 4 to 6
-     beetles and dark leaf bits blowing out and falling, tumbling.
-   - Moonfire (arcane on Era): silver firework sprays at random spots,
-     fading. No stars.
-   - Fire (a fire-damage weapon or proc): a scorched splat with a charred
-     leaf burning on it, then embers rising. Frost: pale frozen leaves
-     with an ice shard on frozen blood. Holy: a harsh flare and ring on a
-     scorch. Shadow: black leaves on dark ichor with a smear.
-   - "Heals too", a crit Healing Touch or Rejuvenation tick: vines and
-     green or gold smoke rising, never flowers or hearts.
-   - A new record: the screen's edges go deep green and fade slowly.
-   - Sounds on Era: Angry cat, Tiger growl, or Gore: Slice per crit; Bear
-     roar, Monster bear, or Lion roar for a record; Wet splat hit from
-     Medium on about 3 crits in 10. None silent.
+5. **Styles of Brutal** (Spellburst, Fel, Naturalist; nameplates on):
+   - Each reads "(18+)" and is refused with "I'm 18 or over" clear; clear
+     the box while on one: back to Tame, with a line. A character saved on
+     Spellburst without the box logs in on Tame.
+   - Your own damage takes the style; damage on you and others' stay
+     Brutal's. Check with `/dcm test fire` (and the other schools) on a
+     target, then let a mob hit you, then watch a groupmate's crits.
+   - **Spellburst** (a Mage, then a Priest): Brutal's wounds with a glow in
+     the school's color on each crit (Fireball orange, Frostbolt blue,
+     Shadow Bolt purple, Arcane Missiles violet, melee white); a ring
+     closes a new record's set. Spell hits on the mob are denser than on
+     Brutal, with a bigger crit flash. "Heals too": a crit heal rises in
+     gold or green light. Sounds on Era: Magical disappear or Fading slow
+     disappear per crit, Disappear blow swoosh for a record. The extra
+     sound joins only about 3 crits in 10, from Medium.
+   - **Fel** (a Warlock, then a Paladin): every school in dark blood,
+     purple, and fel green: Shadow Bolt black-purple, Immolate fel green,
+     a Paladin's holy black, purple, and green smoke on the mob, never
+     gold. Cracks creep from the wounds; a wisp of dark smoke rises on each
+     crit; a new record darkens the screen's edges. Sounds on Era (Dyre's
+     Sounds 1.4.0): Wet smash, Mud splat, or Heartbeat per crit; Demon growl
+     for a record; never two heartbeats at once. With Dyre's Sounds 1.3.0:
+     Gore: Bash or Chop, Big monster roar or Monster bear.
+   - **Naturalist** (a Druid): Cat or Bear form melee crits mix claw
+     scratches, bite marks, and splatter, each at its own angle, some with
+     a trickle straight down. "Claws only in Cat or Bear form" sits under
+     the Theme, greyed except on Naturalist, clear by default; tick it: out
+     of form, a Warrior, and crits on you are Brutal's splatter; a Hunter's
+     pet claws, a Warlock's demon splatters. Other schools in earthy tints
+     (moss, bark, amber, silver); Wrath throws leaves on the screen, and
+     its hits on the mob are a flurry of leaves and beetles; Moonfire's are
+     silver sparks. Crit heals: vines and green or gold smoke. A new
+     record: the screen's edges go deep green. Sounds on Era: Angry cat,
+     Tiger growl, or Gore: Slice; Bear roar, Monster bear, or Lion roar.
+   - Brutal: a Druid in Cat or Bear form gets claws, bites, and splatter in
+     Brutal's red; in caster form, and a Warrior, Brutal's splatter.
 7. **Sounds section**: tick "Crit: my own sound", choose Dyre's Blades:
    Laser sword swing (it plays once); crits now always play it, also after
    switching theme. "Reset sounds to theme": the theme's random ones again.
@@ -158,26 +131,17 @@ in, and BugSack on to catch errors.
    crit Holy Light or Flash of Light: Tame shows pink and gold hearts (they
    beat), a sparkle, or a butterfly rising; Brutal warm red and gold
    droplets of light rising, no blood; Fel glowing green wisps rising;
-   Spellburst gold light. Damage crits look as before.
+   Spellburst gold or green light. Damage crits look as before.
 8. **By damage school** (full client restart: five new textures):
-   - A Mage on Spellburst meleeing with a staff: a crit shows a white flash
-     (a burst and a ring) without the 18+ box, blood with it. Fireball an
-     orange burst with a flame; Frostbolt a blue burst with an ice shard;
-     Arcane Missiles violet bursts. Every spell still looks like Spellburst.
    - A Warrior on Brutal with a fire-damage enchant or proc (Fiery Weapon,
      a fire-damage weapon): its crit is still a wound, charred dark with a
      few rising embers; melee crits red blood as before. On Tame: little
      flames, and a pow for melee.
-   - A Warlock on Fel: Shadow Bolt purple-black smoke; Immolate or Searing
-     Pain hellfire smoke with a flame lick; Frostbolt-like frost icy smoke
-     with a shard; melee or the pet Brutal's red blood; no sparkles.
-   - Each theme is recognisable at a glance whatever the school.
    - Nature crits (a Druid's Wrath or Moonfire, or `/dcm test`): Tame a
-     puff of 3 to 5 small tumbling leaves blowing out and down; Spellburst
-     a green burst with the puff blowing out and up; Brutal one or two
-     dark, blood-soaked leaves stuck on the red splat with a smear running
-     down; Fel a leaf in hellfire or fel green with a flame on it, then
-     grey ash falling from it as it fades. Never acid green on Brutal.
+     puff of 3 to 5 small tumbling leaves blowing out and down; Brutal one
+     or two dark, blood-soaked leaves stuck on the red splat with a smear
+     running down (Fel's in dark green and purple). Never acid green on
+     Brutal.
    - A spell of two schools (Frostfire, Shadowflame) shows its first:
      fire.
    - On Tame, now and then a little rainbow (in its own colors) floats up
@@ -207,8 +171,34 @@ in, and BugSack on to catch errors.
    white heading is the sort the hint below names. Click each heading twice
    (both directions). Escape closes it. Options opens the page. Reset records in combat refuses; out
    of combat it asks, and Yes clears.
-13. **Game settings untouched**: violence level, master and effects volume,
-   and sound effects are what they were before.
+12a. **Hit effects** (Forever and Era, enemy nameplates on with V):
+   Brutal at Low, hit a mob: every hit (a DoT tick too) plays from under
+   its nameplate, over its body, following the mob. Melee: a blood spray.
+   A crit: twice as much, bigger, thrown farther, and a big burst of
+   blood (or a glow in the school's color) at the impact: tell a crit
+   from a hit at a glance, on the mob and on you. `/dcm test` cycles (`/dcm test fire` and so on holds one) fire, frost, arcane, shadow,
+   nature, holy on your target's plate (on you without a target): flames
+   fall through the body, snow drifts and turns, sparks burst, smoke
+   rises, holy throws golden sparkles (no ring). The effect starts at
+   the mob's body, well under its nameplate. Distance: hit a mob up
+   close, then one at 30 yd (a ranged pull or a wand): the far one's
+   effect is much smaller, and nearer its plate. Is the spot on the body right, or too high
+   or low? Get hit: the same over your character in the middle of the
+   screen (is it on your character?). Get healed: green plus signs rise.
+   Fel: shadow smoke is greenish. Tame or None: nothing on the mob.
+   Turn nameplates off: nothing on the mob, the screen splatter still
+   plays. Kill a mob mid-effect: its effects go with its plate. Clear
+   **Hit effects on enemies** or **on you**: none there.
+   Bystanders (Nearby enemies): a mob hitting another player or a guard
+   with a nameplate shows its hit effect on them, and its crits splatter
+   your screen as others' crits; on your friendly target too (My target). Others' crits Off: none.
+13. **Game settings untouched**: master and effects volume and sound effects
+   are what they were before.
+13a. **Gore** (Forever and Era): `/run print(GetCVar("violenceLevel"))`
+   first (your own level). Brutal at Low prints 3, Medium 4, High and Total
+   Mayhem 5; None, Tame, or clearing the 18+ box prints your own level again.
+   Hit a beast or humanoid on None and on Brutal at Total Mayhem: more blood on the
+   model? Change it in combat: it applies when combat ends.
 14. **Anniversary**: repeat 1, 2, 4, and 10.
 15. **Forever, launch day** (about 5 minutes; Brutal or Tame at Medium):
     1. `/dcm debug`: `detection=unitcombat combatLogRestricted=true`, and no
@@ -229,8 +219,13 @@ in, and BugSack on to catch errors.
        - after the fight, `meter: ...` lines: is the meter readable then,
          `local=true` on your line, and what are `maxAmount` and
          `detailAmount` (a largest hit, or totals)?
-    3. Did crits play effects, and does `/dcm` show records (the hint says
-       "Solo guesses from combat text")? Do they match your combat text?
+    3. Did crits play effects? `/dcm` opens the options, not the records
+       window. In the Records section every row but Test crit is greyed,
+       and each one's tooltip says "Presently, WoW Forever blocks addons
+       ability to read damage amounts you do. ..."; the greyed buttons do
+       nothing. `/dcm records` says "No records on this client: it
+       hides how much each hit does from AddOns" (build 70938 hides every
+       amount: `secretAmount` equals `hits` in `/dcm debug`).
     4. Group with someone: with Nearby enemies their crits on your target
        and on enemy nameplates play, with no record; My target only the
        target; Off nothing.

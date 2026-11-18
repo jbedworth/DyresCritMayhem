@@ -38,95 +38,66 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
     not"; `DCM.FeralCrit`, below) draws `brutal.beast`, Naturalist's claw,
     bite, and splatter mix in Brutal's red and run chances; always on,
     no setting.
-  - **Spellburst** (author: "something for mages, warlocks and priests ...
-    doing their thing at range"; working name, one string to rename), not
-    mature: bursts of light (Burst1-2: one spins, one twinkles) tinted by
-    spell school (`schoolColors`, `DCM.SchoolColor`: fire, frost, arcane,
-    shadow, nature, holy, physical white, read in that order for a mixed
-    school; unknown or secret: arcane white), drawn with ADD blending
-    (`blend`; every pooled texture is set again each time), motes that rise
-    from Medium (`drips`, `dripMotion = "float"`), and a ring (`ring`,
-    `ringFrom = "high"`) closing the set for a new record and from High.
-    `heals = true`: crit heals show too, rising, tinted holy or nature
-    (else holy). Sounds from Dyre's Sounds' own: crit {magical, fadingslow,
-    war2magicchimes, instrumentsbelltrill}, new record {blowswoosh,
-    war2choir, instrumentschimeascending}, extra {teleportvanish,
-    disappearingswoosh, impactsbubblesmash} from Medium (the Dyre's Picks
-    files play on Classic Era; the game's kit sounds only where Playable). The school comes from the combat log (`spellSchool`, 14;
-    swings are physical) or `UNIT_COMBAT`'s school mask.
-  - **Fel** (author: "a darker, more... mature theme for warlocks ... No
-    magic twinkles or sparkles, keep it scary/dark"; working name, one
-    string to rename): 18+ like Brutal (`mature = true`; author: "If we do
-    anything truly demonic, it gets 18+"), with the same refusal and the
-    same fall back to Tame when the box is cleared. Smoke that curls (a slow spin)
-    as it rises and dissolves (Smoke1-2), embers or ash falling from Medium
-    (Embers1, ADD via `textureBlend`), cracks spreading from where the smoke
-    landed (`run` Crack1 with `runGrow = "center"`, on the overlay, since the
-    smoke drifts; never with a falling ember), and for a new record a dark
-    vignette around the whole screen (`vignette`, `DCM.PulseVignette`: in
-    0.35 s, then a 3 s fade scaled by "Stays on screen"). Palette fel green,
-    shadow purple-black, hellfire; `schoolPalette`: shadow crits shadow,
-    fire crits hellfire or fel, anything else (or unknown) the palette.
-    Heal crits: glowing fel-green wisps drawn upward (its smoke and embers,
-    added light), no sparkle. Sounds: Dyre's Fel Sounds (Dyre's Sounds
-    1.4.0; author: "Here are some 'Fel Sounds' for that theme"), files
-    that play on Classic Era: crit {felwetsmash, felmudsplat,
-    felheartbeat}, new record {feldemongrowl}, extra {felheartbeat} from
-    Medium at 30%. The extra is the heartbeat, and `Sound` (Effects.lua)
-    skips any extra that is the same key as the crit's own sound, so it
-    never doubles. `sounds.fallback`: the earlier pools (crit {gorebash,
-    gorechop, impactslowthud, impactsstrangeclang, instrumentssynthbuzz},
-    new record {bigmonsterroar, monsterbear}, extra {orcfury,
-    instrumentspitchpipedistressed}) for an event none of whose keys this
-    Dyre's Sounds has or plays (1.3.0 and older), before the other events'
-    keys and the Talent chime.
-  - **Naturalist** (author: "a Druid/nature theme ... let's make it more mature
-    and a touch gory, not whimsical"; named by the author: "Naturalist is
-    the theme name"; key `naturalist`):
-    18+ (`mature = true`), same refusal and fall back to Tame. Its own look
-    is savage for every physical crit by default (author: "random
-    splatter or claw/bite marks is fine for the theme"). The per-character
-    box "Claws only in Cat or Bear form" (`clawsInForm`, default off; a
-    child row of the Theme, live where the theme has `formClaws`, so on
-    Naturalist only; author: "if the form check is doable, maybe we keep
-    it?") keeps the mix to a beast's physical crit and draws Brutal's
-    splatter, drips, and runs otherwise. A beast's crit (`DCM.FeralCrit`,
-    shared with Brutal: yours in Cat 768, Bear 5487, or Dire Bear 9634,
-    from Detect.lua's `DCM.feralForm`, cached on UPDATE_SHAPESHIFT_FORM
-    from GetShapeshiftFormInfo's fourth value, secret or unreadable as no
-    form; or your pet's when you are a Hunter, `DCM.beastPet`, since
-    Hunter pets are beasts and telling a demon from a beast otherwise
-    needs localized creature types; others' crits and crits on you never).
-    The mix (author: "3-4 claw scratches that randomly drip blood,
-    similar to brutal but more claw and bite mark like", then "make sure
-    it mixes up the base effect (bite, scratches, splatter) and the
-    direction of the drips is always down, but the bite and scratch
-    direction (and number of scratches) should be random; not uniform"):
-    each effect picks among Claw1 (four scratches), Claw2 (three), Claw3
-    (two), each unevenly spaced, Bite1 (an arc of punctures, upper and
-    lower), and Brutal's Splat1 and Splat3, in blood red; like every
-    still splat it gets a random turn, a random mirror, and +/-20% size.
-    A run is always straight down: StartRun sets the run's rotation 0 and
-    unmirrored texture coords and anchors it TOP to the splat's CENTER
-    (a turn does not move the anchor); the beast's runs at 30/40/50/65%
-    (at least Brutal's), drips from High. `DCM.CritStyle(theme, school,
-    crit)` passes the crit to a style function for the form check. Schools (Themes.lua `naturalist.styles`, author "graphic/darker"):
-    nature "Green 'wrath-like' bursts with insects and leaf debris
-    'poofing' out": Burst1-2 dark green drawn BLEND (murky, not added
-    light), an accent of 4-6 Insect1 beetles and dark leaves blowing out
-    and down, tumbling; arcane "Random Silver bursts (firework-like) that
-    fade": Firework1, silver, ADD, still; fire a scorched splat with
-    charred leaves burning on it (Flame1 overlay) and embers after; frost
-    pale, pinkish leaves with an ice shard on frozen blood; holy a harsh
-    Burst1 flare and Ring1 on a scorch; shadow black leaves on dark ichor
-    with a run. No runs for the bursts, fireworks, or scorches. Heals
-    (author: "no flowers, sprouting vines are fine and/or green/gold rising
-    smoke"): Vine1 and Smoke1-2 (ADD), green and gold. A new record (author:
-    "like fel, but green-tint"): Vignette2, Vignette1's frame in white,
-    tinted `vignetteColor` deep green (Fel's black one is drawn untinted).
-    Sounds, Dyre's Sounds files so they play on Era: crit {angrycat,
-    tigerroar, goreslice}, new record {bearroar, monsterbear, lionroar},
-    extra {wetsplat} from Medium.
+  - **Variants of Brutal** (John, 2026-11-17: "pivot the themes to be
+    variants of Brutal that stylize the baseline effects, instead of being a
+    completely different set ... Brutal is neutral, keeps the default
+    effects looking default. But picking a theme puts me 'in
+    character'"; "effects on me retain the brutal effect. What I'm
+    stylizing is the damage I'm doing"; Spellburst "18+ only"; Naturalist
+    "Yes, a variant"; the crit splatter "Baseline, styled"). Themes.lua
+    `BrutalBase` fills a variant's splats, colors, size, drips, runs from
+    Brutal and sets `variant`; `Variant(theme, spec)` builds its school
+    styles: Brutal's look for each school (`brutal.styles[kind]`, the beast
+    mix in Cat or Bear form) with the variant's splat colors
+    (`spec.colors[kind]`), its accent recolored (`spec.accents[kind]`,
+    overlay and after too), its own touch (`extraAccent`, from
+    `spec.extra[kind]` or `.all`, drawn by Splatter after the accent), its
+    run, and its hit styles (`spec.hits[kind]` over `DCM.HIT_STYLES`, as
+    `theme.hitStyles`; `emphasis` multiplies the pieces, `flashScale` the
+    crit flash). `DCM.Look(theme, kind)` (Effects.lua): a variant draws
+    for "mine", "pet", and "self" (/dcm test); "taken", "others", and
+    bystanders draw Brutal. Sounds and the heal style stay the theme's
+    for every crit. Each variant is mature (18+).
+    - **Spellburst** (author: "something for mages, warlocks and priests"):
+      Brutal's looks, a glow (Burst1-2, ADD, onTop) in the school's color
+      on each crit (physical white), a Ring1 closing a new record's set;
+      spell hits `emphasis` 1.4 and `flashScale` 1.3. Heals: Burst1 and
+      Mote1 rising, holy gold and nature green. Sounds unchanged (Dyre's
+      Sounds' own: crit {magical, fadingslow, war2magicchimes,
+      instrumentsbelltrill}, new record {blowswoosh, war2choir,
+      instrumentschimeascending}, extra {teleportvanish, disappearingswoosh,
+      impactsbubblesmash} from Medium). A character saved on it without the
+      18+ box logs in on Tame.
+    - **Fel** (author: "Fel is gives the effects from Brutal an evil,
+      demonic tinge, mixing in fel green and purple shades"; "If I choose
+      Fel on my Paladin, Holy is no longer a golden glow/sparkle. It's now a
+      more evil black/purple/fel-green effect"): every school's splats in
+      dark blood, purple-black, and fel green; accents in fel green and
+      violet; Crack1 runs spreading from the wound (`runGrow = "center"`);
+      a wisp of dark smoke on each crit; Vignette1 for a new record. Hits:
+      every school recolored, holy turned to purple, green, and black smoke
+      (motion smoke, Smoke1 flash). Heals: fel-green wisps. Sounds: Dyre's
+      Fel Sounds (Dyre's Sounds 1.4.0): crit {felwetsmash, felmudsplat,
+      felheartbeat}, new record {feldemongrowl}, extra {felheartbeat} from
+      Medium (`Sound` skips an extra equal to the crit's own sound);
+      `sounds.fallback` for 1.3.0 and older.
+    - **Naturalist** (author: "a Druid/nature theme ... more mature and a
+      touch gory"): physical its own mix of Claw1-3, Bite1, Splat1, Splat3
+      in blood red, turned and mirrored at random, runs straight down
+      (StartRun), 30/40/50/65% (author: "3-4 claw scratches that randomly
+      drip blood", "make sure it mixes up the base effect (bite, scratches,
+      splatter)"); with "Claws only in Cat or Bear form" (`clawsInForm`,
+      default off, a child row of the Theme live where `formClaws`) only a
+      beast's crit (`DCM.FeralCrit`: yours in Cat 768, Bear 5487, Dire
+      Bear 9634 from `DCM.feralForm`, cached on UPDATE_SHAPESHIFT_FORM; a
+      Hunter's pet, `DCM.beastPet`), Brutal's splatter otherwise. Other
+      schools earthy (moss, bark, amber, silver); nature crits throw a puff
+      of leaves (BlowingLeaves, down). Hits: nature a flurry of Maple1,
+      Oak1, Birch1, and Insect1 (count 1.5); arcane Firework1 and sparkles
+      in silver; the rest recolored. Heals: Vine1 and Smoke1-2 (ADD), green
+      and gold. A new record: Vignette2 tinted `vignetteColor` deep green.
+      Sounds: crit {angrycat, tigerroar, goreslice}, new record {bearroar,
+      monsterbear, lionroar}, extra {wetsplat} from Medium.
   - Every new character starts on Tame, whatever its class (author: "start
     everyone on tame, let people pick"); Spellburst is a dropdown choice.
   - Tame's textures move while they hold (`animations`, author: "rotate
@@ -138,25 +109,35 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
     textures, `size`, `motion`, and Dyre's Sounds pools (`sounds.crit`,
     `big`, `extra`, `extraFrom`). Planned (Laser sword can use Dyre's Blades): Cartoon smack (BAM/POW), Laser sword, Arcane, Retro
     arcade, Kung fu. Never "Lightsaber" or any film's audio or marks.
-- **Intensity** (Core.lua `INTENSITIES`): Off (the default: every effect
-  off) → Low → Medium → High → Total Mayhem, for any theme: more, bigger, longer. At
+- **None** (author, 2026-11-17: "Move 'None' (zero) from the slider (so
+  the slider goes from Low to Total Mayhem) to the Theme selector. Have it
+  be the first item, above Tame. Make Tame the default."): a theme key
+  `none` (`DCM.NONE_THEME`, Themes.lua, `none = true`, `sounds = {}`),
+  outside `DCM.Themes()` (the effect themes; style matrix, sound checks),
+  listed first in the Theme dropdown. It plays no effect, sound, or hit effect
+  (`PlayCrit`, `/dcm test` says so); records count; the stay slider shows
+  no seconds; not mature, so it puts the violence level back. A saved
+  intensity `off` (0.2.1 and older) becomes None at Low; so does an old
+  test build's level `off`.
+- **Intensity** (Core.lua `INTENSITIES`): Low (the default) → Medium →
+  High → Total Mayhem, for any theme: more, bigger, longer. At
   100%: Low 2.5 s, Medium 4 s, High 7 s, Total Mayhem 12 s (hold plus fade; the
   earlier Fun, Spicy, Gory, and Mature numbers). Records and their chat line
-  work at every intensity, Off too. Total Mayhem stays 12 s, not "until combat ends"
+  work in every theme, None too. Total Mayhem stays 12 s, not "until combat ends"
   (the author has not chosen that).
 - **Stays on screen** (author), right under the intensity: 25-300% in steps
   of 25, default 100% with the toolkit's gold default mark
   (`AddDefaultTick`); it scales the intensity's hold and fade together. Its
   value reads "100% (7 s)" for the current intensity, and its tooltip lists
   every intensity's seconds at 100%.
-- **The 18+ lock is on the theme**: Brutal, Fel, and Naturalist need the account-wide box.
+- **The 18+ lock is on the theme**: Brutal, Spellburst, Fel, and Naturalist need the account-wide box.
   Choosing it without the box says so and keeps the theme; unticking the
   box puts a character on Brutal back on Tame, with a line; a character
   saved on Brutal logs in on Tame while the box is clear. The dropdown reads
   "Brutal (18+)" while locked.
 - **Migration** from earlier 0.1.0 test builds (Core.lua `OLD_LEVELS`): old
   level tame → Tame at Low; fun, spicy, gory, mature → Brutal at Low,
-  Medium, High, Total Mayhem (Tame without the 18+ box); off → Off. The old `level`
+  Medium, High, Total Mayhem (Tame without the 18+ box); off → None at Low. The old `level`
   key goes; a save that already has `intensity` keeps it.
 - **Records** (Records.lua, "definitely include"): per character, each
   ability's highest hit and highest crit, yours and your pet's (labeled
@@ -172,7 +153,7 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
   crit; the sort is saved), with Options and Reset records. Reset asks first
   with a StaticPopup and never in combat. The settings open from the
   toolkit's "Dyre's AddOns" page, the window's button, or `/dcm options`.
-- Commands: `/dcm` (or `records`), `options`, `test`, `unlock`, `lock`,
+- Commands: `/dcm` (the settings while amounts are hidden), `records`, `options`, `test`, `unlock`, `lock`,
   `reset` (the pop's place), `resetrecords`, `debug` (its second line counts
   solo hits on enemies since login and why each made no record:
   DCM.RecordCountsText in Detect.lua) and `probe` (both run
@@ -229,22 +210,10 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
     stick, maybe slowly smear down"); shadow black ichor
     with a wisp of smoke; arcane its blood with a violet crackle; holy
     seared wounds with a light flare.
-  - Spellburst: always its bursts, motes, and rings tinted by school; fire,
-    frost add a flame or ice shard inside the burst; nature a green burst
-    with a puff of 3 to 5 small leaves blowing outward and up, each
-    tumbling. Tame's nature leaves get the same puff, drifting down.
-  - Fel: always its smoke, cracks, and embers; fire hellfire with flame
-    licks; frost icy smoke and cracks with rime (a shard); nature rot (more
-    cracks) with a leaf that burns (author: "make them burn and fall to
-    ash"): the leaf in hellfire or fel green with a Flame1 lick (ADD) on
-    it, then, at 60% of the hold (C_Timer.After, dropped after
-    ClearEffects), grey Embers1 ash falling from the same spot as the leaf
-    fades. An approximation: no burn-away mask. Shadow its purple-black;
-    arcane violet; holy pale. No sparkles.
-  - The physical-gore exception: a physical crit is Brutal's gore in every
-    theme but Tame. Brutal and Fel need the 18+ box anyway; Spellburst
-    shows gore only with it, else a white impact flash (a burst and a ring,
-    in its own language; never Tame's pow).
+  - Spellburst, Fel, Naturalist: Brutal's looks above, restyled (see
+    Variants of Brutal). The old per-theme languages (Spellburst's bursts,
+    Fel's smoke and burning leaves, Naturalist's fireworks and insect
+    bursts) are gone.
 - New shared textures (scripts/build_splatters.py): Flame1 (soft, drawn as
   added light), Shard1, Snowflake1, Pow1, and the leaves Maple1, Oak1, and
   Birch1 (white with a rim). Leaf1, a plain lens leaf, was retired for them
@@ -269,6 +238,64 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
   effect (area spells), not a full set. Brutal's drip slides down as it
   fades; Tame's effects rise.
 - The "On-screen effects" switch covers every theme's effects.
+- Hit effects (author: "Build the nameplate blood spray too", then
+  2026-11-17: "The hit effects should trigger every time a hit lands and
+  does damage (even DoTs, ideally). It should look like it's happening to
+  the target (mob, player avatar), and when it crits, it should double",
+  "physical: bloodspray/splatter, cold/frost: snow/ice flurries; fire:
+  burning flames raining down; arcane: spark showers; shadow/fel: black or
+  greenish smoke", "heals should be little green +'s", "Tame gets none of
+  these on target effects for now"). `DCM.PlayHit` (Effects.lua) for every
+  damage or heal that landed (a readable amount above 0, or a secret one):
+  by you or your pet (`mine`, `pet` switches), others on `OthersOn`
+  targets (half, at most `OTHERS_HITS` per 0.5 s), and anything on you
+  (`taken`). Settings: `spray` "Hit effects on enemies" and `hitsOnYou`
+  "Hit effects on you", per character, default on. Styles are data in
+  Themes.lua `DCM.HIT_STYLES` (physical, impact, frost, fire, arcane,
+  shadow, nature, holy (as arcane, gold; John: "drop the circle-halo"), heal: textures, colors, blend, size, motion);
+  motions in Effects.lua `HIT_MOTIONS` (spray, burst, flurry, blaze,
+  smoke, rise). A variant's `hitStyles` restyle your own hits (see
+  Variants of Brutal); `noHits` (Tame) and None show none. Physical
+  blood needs the 18+ box, else `impact`; an unknown or secret school is
+  physical. Nature `SPELL_PERIODIC_DAMAGE` shows nothing (the game's own
+  poison cloud); Forever's `UNIT_COMBAT` cannot tell ticks apart. Pieces:
+  Low 2, Medium 3, High 5, Total Mayhem 7, times a style's `count`
+  (frost and nature 2.5: fine motes, with small flakes and shards for
+  frost and small sparks for nature; John: "denser ... more subtle", "Do
+  the same for nature"); a crit (John, after play
+  testing: "crits are not visibly discernable from normal hits") doubles
+  them, makes them 60% bigger, sends them 50% farther, and adds the
+  style's `flash`, one big piece at the impact that swells 1.5x and fades
+  in 0.45 s (a blood burst for physical; a glow or smoke puff in
+  the school's colors otherwise); a new record +3; one set per target per 0.1 s unless
+  it crits. Anchor: an enemy's nameplate (`C_NamePlate.GetNamePlateForUnit`;
+  secret, missing, or `IsForbidden` skip it), 76 px under its center (John:
+  "about 2x further down, so it looks like it's coming from the mob"); a
+  heal on your target, its plate when one shows; you: your own nameplate
+  if the client shows one, else UIParent's center, 5% of its height
+  below (where the camera keeps your character). Own frame `hitLayer`
+  (BACKGROUND), pool of 120. Distance (John: "within 1-3 meters, use the
+  current size, if the mob is 30m away, it should be much smaller"):
+  `DCM.UnitDistance` probes nearest first, CheckInteractDistance 3 and 4
+  (about 10 and 28 yd) and `C_Item.IsItemInRange` on LibRangeCheck-3.0's
+  Era items (5, 20, 30, 40 yd; requested at load, skipped while not
+  loaded); the client blocks these in combat for a unit you cannot attack
+  (found in client on Forever: ADDON_ACTION_BLOCKED), so in combat
+  `UnitDistance` checks `UnitCanAttack` first and skips (full size).
+  `DCM.DistanceScale` (tuned in play, John: "a bit smaller" at 30+,
+  "slightly bigger" up close): 1.15 up to 5 yd, 0.95 at 10, 0.6 at 20,
+  0.3 at 30, 0.24 at 40, 0.22 beyond, in a line between; no answer, 1. It scales an
+  enemy's pieces, their spread and travel, the flash, and the drop under
+  the plate; hits on you stay full size. Unconfirmed in client: the items
+  answering, and on Forever. `NAME_PLATE_UNIT_REMOVED` releases a plate's
+  effects (`DCM.ReleaseSprays`). The screen splatter and the sounds stay
+  crit-only. `/dcm test [type]` (John: "dcm test <type> ... when blank,
+  have it continue to rotate"; the one command with a second word:
+  fire, frost, arcane, shadow, nature, holy, physical, heal) also plays its school's hit on your target's
+  plate, else on you (`DCM.TestHit`). No `PlayerModel` spell visuals:
+  unverified display IDs, and a model per hit costs more. Unconfirmed in
+  client: the spot under the plate, the spot for your character, and
+  Forever's plates.
 - Moving effects: each loop is its own AnimationGroup on the splat, made
   once per splat and kind and stopped when the splat finishes, is reused,
   or is cleared; a run is one more pooled texture per splat, under it in the
@@ -319,10 +346,20 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
   rings, or vignette: Tame hearts (beating), a sparkle, or a butterfly in
   pink and gold; Brutal warm red and gold droplets of light (embers and
   motes, added light; never blood); Fel glowing fel-green wisps.
-  Spellburst keeps its own look (`heals = true`), tinted holy or nature.
-- **Never change a CVar** (violence level, volume, sound mute): the AddOns we
-  studied did, and that is out (author). tests/run.lua fails on `SetCVar` and
-  on an `"OnUpdate"` or `pcall` in runtime code.
+  Spellburst Burst1 and Mote1 light, holy gold and nature green; Naturalist vines.
+- **Never change a CVar but the violence level** (volume and sound mute stay
+  out). The first brief said no CVars at all, since the AddOns we studied
+  changed them; John lifted it for gore (2026-11-17, "That is a stupid rule",
+  then "Build it anyway" after `violenceLevel` read 5 across a logout):
+  `DCM.ApplyGore` (Core.lua) sets `violenceLevel` from the intensity's
+  `violence` (Low 3, Medium 4, High and Total Mayhem 5) for a mature theme
+  with the 18+ box, first keeping the player's own level account-wide
+  (`DyresCritMayhemAccountDB.violenceOwn`); None, a cute theme, or the box
+  cleared puts it back. Runs on login and on the theme, intensity, and 18+
+  setters; in combat it waits for `PLAYER_REGEN_ENABLED`; nothing without
+  the CVar. Unconfirmed in client: whether the level shows more blood
+  (John saw no change on a plant mob at 5). tests/run.lua fails on any other
+  `SetCVar` and on an `"OnUpdate"` or `pcall` in runtime code.
 
 ### Crit detection (Detect.lua)
 
@@ -362,7 +399,18 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
   work in Forever"; checked against the pinned source 943764493e):
   - `UNIT_COMBAT` (no secret markings), registered for every unit: "WOUND"
     with "CRITICAL" on "target", "focus", or "nameplateN" is a crit on an
-    enemy; "WOUND" with "CRITICAL" or "CRUSHING" on "player" one on you;
+    enemy, only when `UnitCanAttack` says so (John, 2026-11-17: "enemies
+    only"). A wound on a unit you cannot attack is a bystander's (John:
+    a stranger's "bloodsplatter as if they were an enemy mob, and, I liked
+    it"): its hit effect only (`PlayHit` kind "others", `bystander`), by
+    `othersScope` (your friendly target from My target, any other shown
+    nameplate from Nearby enemies), and a crit as others' crits (John:
+    "put the crit splatter from other's crits back"); never a record or a
+    count.
+    On the combat log the same: `DCM.BystanderOn` (Detect.lua tracks
+    non-enemy nameplates apart, `bystanders`), and `OthersOn` takes your
+    target only when it is an enemy. A bystander's distance cannot be read
+    in combat: scale 0.6; "WOUND" with "CRITICAL" or "CRUSHING" on "player" one on you;
     "HEAL" with "CRITICAL" on "player" a crit heal on you (solo only). The
     same flag, amount, and school within 0.05 s count once (the target and
     its nameplate both fire).
@@ -377,10 +425,34 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
     Melee, or unknown with a pet out; a spell-school hit is the latest cast
     within 1.5 s (projectiles); else no record. Damage over time lands as the
     last cast: best guesses, and the window says so.
+  - **Confirmed in client (build 70938, 2026-11-16, /dcm probe on Danger
+    Klose and /dcm debug on Dyra Darkwing): every `UNIT_COMBAT` amount on an
+    enemy is secret** (996 of 996 hits). So no records on Forever:
+    `DCM.amountsReadable` (the latest enemy hit's amount, readable or
+    secret) gates `RecordsAvailable`/`RecordsGuessed`, and
+    `DCM.AmountsHidden()` gives the window its "No records on this client"
+    text (John: "Hide on Forever"). The matching code stays, so a client
+    that shows amounts keeps records again. Effects are unchanged.
+  - While `DCM.AmountsHidden()` at login (John, 2026-11-17: "On Forever,
+    we should disable the show highest crit stuff, since we can't do it"):
+    the Records rows (Show new records on screen, Announce in party and
+    guild, the toolkit's Record pop size and Reset size, Show records,
+    Reset records) are greyed with the tooltip `DCM.AMOUNTS_BLOCKED`
+    (John's words: "Presently, WoW Forever blocks addons ability to read
+    damage amounts you do. If they fix this, we can enable these features
+    again."). Options.lua `Block`: checkboxes and sliders through
+    `AddModifyPredicate`; button rows ignore it
+    (`SettingsButtonControlMixin`), so the button is disabled after each
+    `InitFrame` and its click emptied; the toolkit's rows are caught by
+    wrapping `layout.AddInitializer` (Blizzard's `Settings.CreateSlider`
+    adds through the category's layout). Test crit stays. Plain `/dcm`
+    opens the settings instead of the empty window (`DCM.OpenMain`; John:
+    "make typing '/dcm' bypass the highest crit screen"); `/dcm records`
+    still opens it. Gated on hidden amounts, not on the client.
   - `C_DamageMeter` (SecretWhenInCombat) has per-spell totals per fight but
-    no largest hit: `maxAmount` only scales the bars
-    (Blizzard_DamageMeter/DamageMeterSourceWindow.lua), so it cannot give
-    records. `/dcm probe` dumps it after each fight to confirm.
+    no largest hit: confirmed in client (Danger Klose: `maxAmount=41` is
+    Attack's total, the largest spell total; `detailAmount=0`). It cannot
+    give records.
   - `/dcm probe` (Probe.lua, 3 minutes): every `UNIT_COMBAT`, cast, and the
     meter after combat, each value's secrecy, and DCM's guess; 40 lines to
     chat, up to 600 to `DyresCritMayhemDB.probe`.
@@ -423,12 +495,13 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
 ## Project structure
 
 - Runtime: DyresCritMayhem.toc, then Commands.lua, Core.lua, Themes.lua,
-  Effects.lua, Detect.lua, Records.lua, Window.lua, Probe.lua, Options.lua, plus the thirty-seven
+  Effects.lua, Detect.lua, Records.lua, Window.lua, Probe.lua, Options.lua, plus the thirty-eight
   textures in Textures/ (Splat1-4, Drip1-2, Run1, Butterfly1-2, Star1,
   Sparkle1, Heart1, Burst1-2, Mote1, Ring1, Smoke1-2, Embers1, Crack1, Vignette1
   (64 px, stretched over the screen), Flame1, Shard1, Snowflake1,
   Pow1, Rainbow1 (pre-colored), Maple1, Oak1, Birch1, and Naturalist's Claw1-3,
-  Bite1, Insect1, Vine1, Firework1, Vignette2 (64 px, white, tinted)).
+  Bite1, Insect1, Vine1, Firework1, Vignette2 (64 px, white, tinted), and
+  Plus1 (a heal's plus sign, white with a rim, tinted green)).
 - scripts/build_splatters.py makes the textures: original procedural art,
   grey (the theme tints them; the cute ones white inside with a darker rim,
   so a pastel reads), run-length encoded 32-bit TGAs, seeded and
