@@ -14,8 +14,9 @@ actionlint .github/workflows/*.yml
 tests/run.lua mocks the client: the combat log (fields at their real
 positions), `UNIT_COMBAT`, Settings, frames, AnimationGroups, chat, popups,
 Dyre's Sounds, and the real Dyre's Toolkit files: from ../DyresToolkit when
-that checkout exists, else from the vendored tests/toolkit copy (as in CI).
-No test checks that the copy matches the checkout. Its
+that checkout exists, else from the vendored tests/toolkit copy (as in CI;
+`DCM_TOOLKIT=vendored lua5.1 tests/run.lua` uses the copy with a checkout
+present). No test checks that the copy matches the checkout. Its
 `SetCVar` raises for any CVar but `violenceLevel` (and for that one in
 combat), and registering the combat log raises when the fixture
 restricts it, as Forever does. Mocks cannot show how the effects look, the
@@ -199,6 +200,23 @@ in, and BugSack on to catch errors.
    Mayhem 5; None, Tame, or clearing the 18+ box prints your own level again.
    Hit a beast or humanoid on None and on Brutal at Total Mayhem: more blood on the
    model? Change it in combat: it applies when combat ends.
+13b. **Profile** (Dyre's Toolkit 2.10.0 or newer, two characters):
+   1. On character A: Fel at High, Stays on screen 200%, Hit effects on you
+      off, a sound pick for Crit, and the record pop moved (`/dcm unlock`).
+      Log out.
+   2. On character B (Tame, defaults, some records): open the Toolkit's page
+      (Options > AddOns > Dyre's AddOns), pick A in **Copy settings from**,
+      then Copy and confirm. Chat says `Profile copied.`, with no reload
+      popup.
+   3. At once, no reload: Crit Mayhem's page shows Fel, High, 200%, the box
+      clear, and A's Crit sound; `/dcm test` plays Fel at High; the record
+      pop sits where A put it (`/dcm unlock`); the game's violence level is
+      5 (13a). `/dcm` still shows B's own records.
+   4. **Export profile**, copy the line; change the theme to Tame; **Import
+      profile**, paste, OK: Fel at High again, live. `/reload`: it stays.
+   5. **Copy settings from** Defaults: Tame at Low, every switch at its
+      default, the pop back in its default place; records kept.
+   6. In combat, Copy refuses with `Settings change out of combat.`
 14. **Anniversary**: repeat 1, 2, 4, and 10.
 15. **Forever, launch day** (about 5 minutes; Brutal or Tame at Medium):
     1. `/dcm debug`: `detection=unitcombat combatLogRestricted=true`, and no

@@ -482,6 +482,42 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
   `DyresCritMayhemDB.pop`, size slider "Record pop size"); its text lives in
   a child that fades, so the widget stays shown for the toolkit's outline.
   While unlocked it shows a sample. DCM never moves or scales it itself.
+- **The Dyre's Toolkit Profile** (Toolkit 2.10.0; John, 2026-11-17:
+  "start working on the global 'all Dyre addons settings' syncing with DT's
+  profile, so there is one place to go to persist your profile";
+  ../DyresToolkit/docs/PROFILES.md). Core.lua `JoinProfile` registers
+  `RegisterProfilePart{addon, title, current = DyresCritMayhemDB, sanitize =
+  DCM.SanitizeProfile, characterKeys, refresh = DCM.ApplyProfile}` at
+  PLAYER_LOGIN, once the toolkit is found and before the frames are built;
+  without `RegisterProfilePart` (an older toolkit) nothing changes, and the
+  minimum toolkit version stays 2.0. Live settings stay in DyresCritMayhemDB.
+  - In the profile: theme, intensity, stay, othersScope, the FLAGS, soundPicks,
+    pop (the record pop's place and scale), sortKey and sortDescending (a
+    view choice the player makes, like the others).
+  - `DCM.PROFILE_CHARACTER_KEYS`, never copied, exported, or imported:
+    `records` (this character's own crits: live data, and another
+    character's would be false) and `probe` (a `/dcm probe` log for the
+    author, runtime data).
+  - Not in a profile: DyresCritMayhemAccountDB, not registered (John:
+    account-wide is "user-centric, not per character"). It holds the 18+ box
+    and `violenceOwn`. The box stays account-wide: it is the player's own
+    consent, ticked once for every character (`SetAdult`), and the
+    violence CVar it gates is account-wide too. A mature theme in a profile
+    from an account without the box becomes Tame (`SanitizeProfile`, and
+    `SanitizeTheme` in refresh), as at login.
+  - `DCM.SanitizeProfile`: `SanitizeDB` (any table: empty, partial, older,
+    newer, another character's), then drops keys it does not know
+    (`PROFILE_KEYS`) and checks the theme against the 18+ box.
+  - `DCM.ApplyProfile` (live, no reload): the toolkit has written the part
+    in place (pop stays the widget's store). Effects, sounds, hits, and
+    detection read DCM.db on each event, so refresh sets again only what was
+    set once: `SanitizeTheme`, `ApplyGore` (the violence level, 18+ only),
+    `DyresToolkit.ReapplyWidgets` (the record pop), `RefreshOptions` (the
+    theme, intensity, stay, and sound rows), and `RefreshWindow` (an open
+    records window's sort). The toolkit then notifies every setting on the
+    page. Nothing needs a reload.
+  - tests/run.lua loads the toolkit's Profiles.lua (`noProfiles`: an older
+    toolkit; `profiles`: saved profiles; the player is "Dyre - Realm").
 - The records window is a plain dialog, not a widget: it opens in the middle,
   drags by its body while open, closes with Escape, and saves nothing but
   the sort. It is the family's black and gold panel (Dyre's Quest Targeting's

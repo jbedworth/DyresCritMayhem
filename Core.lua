@@ -458,6 +458,78 @@ function DCM.ReportDebug()
     DCM.Report("debug: since login " .. DCM.RecordCountsText())
 end
 
+-- The Dyre's Toolkit Profile (Toolkit 2.10.0; John, 2026-11-17: "one place
+-- to go to persist your profile"; ../DyresToolkit/docs/PROFILES.md). DCM's
+-- part is DyresCritMayhemDB: the theme, intensity, stay, others' scope, the
+-- flags, the sound picks, the record pop's place and scale (pop), and the
+-- records window's sort. These stay with the character, never copied,
+-- exported, or imported: records (this character's own crits) and probe
+-- (a /dcm probe log for the author). The account's 18+ box and the
+-- player's own violence level (DyresCritMayhemAccountDB) are not in a
+-- profile (John: account-wide is "user-centric, not per character").
+DCM.PROFILE_CHARACTER_KEYS = {"records", "probe"}
+
+-- A full, repaired settings table from any table (empty, partial, older,
+-- newer, or another character's). Keys DCM does not know are dropped (an
+-- imported line's junk or a newer version's). A mature theme needs this
+-- account's 18+ box, as at login: a line from an account without it gets
+-- Tame.
+local PROFILE_KEYS = {intensity = true, theme = true, stay = true, othersScope = true, soundPicks = true,
+    records = true, pop = true, sortKey = true, sortDescending = true, probe = true}
+for key in pairs(FLAGS) do
+    PROFILE_KEYS[key] = true
+end
+
+function DCM.SanitizeProfile(settings)
+    local db = DCM.SanitizeDB(settings)
+    for key in pairs(db) do
+        if not PROFILE_KEYS[key] then
+            db[key] = nil
+        end
+    end
+    local theme = DCM.FindTheme(db.theme)
+    if not theme or (theme.mature and not (DCM.account and DCM.account.adult == true)) then
+        db.theme = DCM.DEFAULT_THEME
+    end
+    return db
+end
+
+-- Live apply after a copy or import: the Toolkit has written the part into
+-- DCM.db in place (pop is the same table, so the widget's store sees it).
+-- Everything that reads the settings reads them on each crit or hit, so
+-- this sets again only what was set once: the game's gore (18+ only), the
+-- record pop's place and scale, the settings page's sound rows, and an open
+-- records window's sort.
+function DCM.ApplyProfile()
+    DCM.SanitizeTheme()
+    DCM.ApplyGore()
+    local toolkit = rawget(_G, "DyresToolkit")
+    if DCM.popWidget and type(toolkit) == "table" and type(toolkit.ReapplyWidgets) == "function" then
+        toolkit.ReapplyWidgets(addonName)
+    end
+    if type(DCM.RefreshOptions) == "function" then
+        DCM.RefreshOptions()
+    end
+    if type(DCM.RefreshWindow) == "function" then
+        DCM.RefreshWindow()
+    end
+end
+
+-- With a toolkit older than 2.10.0 nothing changes.
+local function JoinProfile(toolkit)
+    if type(toolkit.RegisterProfilePart) ~= "function" then
+        return
+    end
+    toolkit.RegisterProfilePart({
+        addon = addonName,
+        title = DCM.Title(),
+        current = function() return DyresCritMayhemDB end,
+        sanitize = DCM.SanitizeProfile,
+        characterKeys = DCM.PROFILE_CHARACTER_KEYS,
+        refresh = DCM.ApplyProfile,
+    })
+end
+
 SLASH_DYRESCRITMAYHEM1 = PRIMARY_SLASH
 SLASH_DYRESCRITMAYHEM2 = BACKUP_SLASH
 SlashCmdList[SLASH_KEY] = function(message) DCM.HandleCommand(message) end
@@ -503,6 +575,8 @@ events:SetScript("OnEvent", function(self, event, loadedName)
         return
     end
     DCM.toolkit = toolkit
+    -- Before the frames: they read the settings a waiting part may change.
+    JoinProfile(toolkit)
     -- Called here rather than from each file's own PLAYER_LOGIN handler, so
     -- startup never depends on event handler order.
     DCM.InitializeEffects()

@@ -36,10 +36,11 @@ local RUNTIME_FILES = {"Commands.lua", "Core.lua", "Themes.lua", "Effects.lua", 
 -- libraries): the real ../DyresToolkit checkout when it exists, else the
 -- vendored tests/toolkit copy (as in CI). The copy may lag; the tests check
 -- behavior, never that the two match.
-local TOOLKIT_FILES = {"Core.lua", "Layout.lua", "Widgets.lua", "Settings.lua"}
+local TOOLKIT_FILES = {"Core.lua", "Layout.lua", "Widgets.lua", "Settings.lua", "Profiles.lua"}
 local TOOLKIT_DIR = "tests/toolkit/"
 do
-    local checkout = io.open("../DyresToolkit/Core.lua", "r")
+    -- DCM_TOOLKIT=vendored runs on the copy, as in CI, with a checkout present.
+    local checkout = os.getenv("DCM_TOOLKIT") ~= "vendored" and io.open("../DyresToolkit/Core.lua", "r")
     if checkout then
         checkout:close()
         TOOLKIT_DIR = "../DyresToolkit/"
@@ -82,6 +83,9 @@ local function fixture(options)
     end}
     env.GetTime = function() return state.now end
     env.InCombatLockdown = function() return state.combat end
+    -- The character's name and realm, for the toolkit's profile key.
+    env.UnitName = env.UnitName or function(unit) if unit == "player" then return "Dyre" end end
+    env.GetRealmName = env.GetRealmName or function() return "Realm" end
     env.issecretvalue = function(value) return state.secrets[value] == true end
     -- The one CVar DCM may change is the violence level (state.cvars; nil
     -- when options.noViolence: a client without it). Any other raises.
@@ -503,11 +507,15 @@ local function fixture(options)
     if not options.noToolkit then
         state.toolkitNS = {InitializeMinimap = function() end}
         env.DyresToolkitDB = {snapToGrid = false}
+        -- options.noProfiles: a toolkit older than 2.10.0 (no RegisterProfilePart).
         for _, path in ipairs(TOOLKIT_FILES) do
-            local chunk = assert(loadfile(TOOLKIT_DIR .. path))
-            setfenv(chunk, env)
-            chunk("DyresToolkit", state.toolkitNS)
+            if not (options.noProfiles and path == "Profiles.lua") then
+                local chunk = assert(loadfile(TOOLKIT_DIR .. path))
+                setfenv(chunk, env)
+                chunk("DyresToolkit", state.toolkitNS)
+            end
         end
+        env.DyresToolkitDB.profiles = options.profiles
         state.toolkit = env.DyresToolkit
     end
     state.dcm = {}
@@ -637,7 +645,7 @@ end
 
 test("login prints the banner from the TOC and the ready hint", function()
     local state = fixture()
-    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.2.2 by Dyre")
+    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.0 by Dyre")
     contains(state.messages[2], "Type /dcm for your records")
     equal(#state.messages, 2, "nothing else at login")
 end)
@@ -3469,6 +3477,173 @@ test("resetting records asks first and never in combat", function()
     state.env.StaticPopupDialogs.DYRESCRITMAYHEM_RESET_RECORDS.OnAccept()
     equal(next(state.db().records), nil)
     contains(state.last(), "cleared")
+end)
+
+-- The Dyre's Toolkit Profile (Toolkit 2.10.0) -------------------------------------
+
+local OTHER = "Alt - Realm"
+-- Another character's saved profile, with DCM's part.
+local function otherProfile(part)
+    return {[OTHER] = {class = "Warrior", seen = 1, parts = {DyresCritMayhem = part}, pending = {}}}
+end
+local function profileOf(state) return state.toolkitNS.profile end
+
+test("DCM joins the toolkit's profile with its settings, not its records", function()
+    local state = fixture()
+    local list = state.toolkit.ProfileParts()
+    equal(#list, 1)
+    equal(list[1], "DyresCritMayhem")
+    state.spell(PLAYER, ENEMY, "Fireball", 300, true)
+    state.slash("probe")
+    local entry = state.env.DyresToolkitDB.profiles["Dyre - Realm"]
+    profileOf(state):Snapshot()
+    local part = entry.parts.DyresCritMayhem
+    equal(part.theme, "tame")
+    equal(part.intensity, "low")
+    equal(type(part.pop), "table", "the record pop's place and scale")
+    equal(part.records, nil, "records stay with the character")
+    equal(part.probe, nil, "a probe log stays with the character")
+end)
+
+test("with a toolkit older than 2.10.0 DCM works as before and says nothing", function()
+    local state = fixture({noProfiles = true, db = {theme = "none", intensity = "high"}})
+    equal(state.toolkit.RegisterProfilePart, nil)
+    equal(state.dcm.available, true)
+    equal(state.dcm.Theme().key, "none")
+    equal(state.dcm.db.intensity, "high")
+    for _, line in ipairs(state.messages) do
+        equal(tostring(line):find("rofile") == nil, true, "no profile line: " .. tostring(line))
+    end
+end)
+
+test("the profile's sanitize gives DCM's defaults from nothing", function()
+    local state = fixture()
+    local clean = state.dcm.SanitizeProfile({})
+    equal(clean.theme, "tame")
+    equal(clean.intensity, "low")
+    equal(clean.stay, 100)
+    equal(clean.othersScope, "nearby")
+    for key, default in pairs(state.dcm.FLAGS) do
+        equal(clean[key], default, key)
+    end
+    equal(clean.soundPicks.crit.on, false)
+    equal(clean.sortKey, "crit")
+    equal(clean.sortDescending, true)
+    equal(next(clean.records), nil)
+    equal(type(clean.pop), "table")
+end)
+
+test("the profile's sanitize repairs any table and never errors", function()
+    local state = fixture()
+    local clean = state.dcm.SanitizeProfile({theme = 5, intensity = {}, stay = "lots", othersScope = "all",
+        soundPicks = "x", sound = "yes", pop = 7, records = "bad", sortKey = 1, futureKey = {deep = true},
+        level = "mature"})
+    equal(clean.theme, "tame")
+    equal(clean.intensity, "low")
+    equal(state.dcm.SanitizeProfile({level = "spicy"}).intensity, "medium", "a test build's level still reads")
+    equal(clean.stay, 100)
+    equal(clean.othersScope, "nearby")
+    equal(clean.soundPicks.big.on, false)
+    equal(clean.sound, true)
+    equal(type(clean.pop), "table")
+    equal(next(clean.records), nil)
+    equal(clean.sortKey, "crit")
+    equal(clean.futureKey, nil, "keys DCM does not know are dropped")
+    equal(clean.level, nil)
+    equal(state.dcm.SanitizeProfile({intensity = "off"}).theme, "none", "0.2.1's Off is None")
+end)
+
+test("copying another character's profile changes the settings live and keeps the records", function()
+    local state = fixture({profiles = otherProfile({theme = "none", intensity = "max", stay = 200, sound = false,
+        spray = false, othersScope = "off", sortKey = "name", sortDescending = false, pop = {scale = 150},
+        soundPicks = {crit = {on = true, key = "dyre_crit"}}, records = {Smite = {name = "Smite", crit = 9}},
+        probe = {lines = {"theirs"}}})})
+    state.spell(PLAYER, ENEMY, "Fireball", 300, true)
+    state.slash("probe")
+    local records, probe = state.db().records, state.db().probe
+    local pop = state.db().pop
+    state.slash("")
+    state.notified = {}
+    local ok, reload = profileOf(state):CopyFrom(OTHER)
+    equal(ok, true)
+    equal(#reload, 0, "no reload")
+    local db = state.db()
+    equal(db, state.dcm.db, "the same live table")
+    equal(db.theme, "none")
+    equal(state.dcm.Theme().key, "none")
+    equal(db.intensity, "max")
+    equal(db.stay, 200)
+    equal(db.sound, false)
+    equal(db.spray, false)
+    equal(db.othersScope, "off")
+    equal(db.soundPicks.crit.on, true)
+    equal(db.soundPicks.crit.key, "dyre_crit")
+    equal(db.records, records, "this character's records, the same table")
+    equal(db.records.Fireball.crit, 300)
+    equal(db.records.Smite, nil, "never the other character's records")
+    equal(db.probe, probe, "this character's probe log")
+    equal(db.pop, pop, "the widget's store is the same table")
+    equal(state.dcm.popWidget.scale, 1.5, "the record pop's scale, live")
+    contains(state.dcm.window.sorted.text, "Sorted by ability, A to Z")
+    local themeNotified = false
+    for _, variable in ipairs(state.notified) do
+        if variable == "DCM_THEME" or tostring(variable):find("THEME") then themeNotified = true end
+    end
+    equal(themeNotified, true, "the settings page shows the new theme")
+end)
+
+test("a copied mature theme needs this account's 18+ box, and sets the gore", function()
+    local part = {theme = "brutal", intensity = "high"}
+    local state = fixture({violence = "1", profiles = otherProfile(part)})
+    equal(profileOf(state):CopyFrom(OTHER), true)
+    equal(state.db().theme, "tame", "no 18+ box: Tame")
+    equal(state.db().intensity, "high")
+    equal(state.cvars.violenceLevel, "1", "the gore untouched")
+    state = fixture({violence = "1", account = {adult = true}, profiles = otherProfile(part)})
+    equal(profileOf(state):CopyFrom(OTHER), true)
+    equal(state.db().theme, "brutal")
+    equal(state.cvars.violenceLevel, "5", "High's gore, live")
+    equal(profileOf(state):CopyFrom(state.toolkit.PROFILE_DEFAULTS), true)
+    equal(state.db().theme, "tame", "Defaults: a clean slate")
+    equal(state.cvars.violenceLevel, "1", "and your own gore back")
+end)
+
+test("export and import carry the settings and never the records", function()
+    local state = fixture()
+    state.spell(PLAYER, ENEMY, "Fireball", 300, true)
+    state.mayhem("none", "medium")
+    state.db().splatter = false
+    local line = profileOf(state):Export()
+    contains(line, "DYRE2:profile:")
+    equal(line:find("Fireball") == nil, true, "no records in the line")
+    state.mayhem("tame", "max")
+    state.db().splatter = true
+    local ok, reload = profileOf(state):Import(line)
+    equal(ok, true)
+    equal(#reload, 0)
+    equal(state.db().theme, "none")
+    equal(state.db().intensity, "medium")
+    equal(state.db().splatter, false)
+    equal(state.db().records.Fireball.crit, 300)
+end)
+
+test("a bad profile changes nothing", function()
+    local state = fixture({profiles = otherProfile({theme = "none", intensity = "max"})})
+    state.mayhem("tame", "high")
+    -- Another AddOn's part that cannot take the settings: all or nothing.
+    state.toolkit.RegisterProfilePart({addon = "Broken", current = function() return {} end,
+        sanitize = function() error("broken") end})
+    state.env.DyresToolkitDB.profiles[OTHER].parts.Broken = {}
+    local ok, why = profileOf(state):CopyFrom(OTHER)
+    equal(ok, nil)
+    contains(why, "Nothing changed")
+    equal(state.db().theme, "tame")
+    equal(state.db().intensity, "high")
+    -- A damaged line, and a copy in combat, change nothing too.
+    equal(profileOf(state):Import("DYRE2:profile:{SDyresCritMayhem;N1;}:0"), nil)
+    state.combat = true
+    equal(profileOf(state):CopyFrom(state.toolkit.PROFILE_DEFAULTS), nil)
+    equal(state.db().intensity, "high")
 end)
 
 local failures = 0

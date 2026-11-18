@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+### Features
+
+- Your Crit Mayhem settings, the record pop's place and size, and your sound picks are now part of your Dyre's Toolkit profile: copy them from another character, or export and import them, on the Toolkit's settings page. A copy applies at once, with no reload. Your records stay with each character, and the 18+ box stays account-wide. This needs Dyre's Toolkit 2.10.0 or newer; with an older Toolkit, nothing changes.
+
 ## 0.2.2
 
 ### Features

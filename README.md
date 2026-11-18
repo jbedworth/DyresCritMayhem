@@ -104,6 +104,18 @@ built but unconfirmed until Forever launches (see Compatibility).
 - `/dcm` opens your records: click a heading to sort by ability, highest
   hit, or highest crit. **Reset records** asks first, and only out of combat.
 
+## Your profile
+
+With Dyre's Toolkit 2.10.0 or newer, your Crit Mayhem settings are part of
+your Dyre's Toolkit profile, with every other Dyre's AddOn: the theme,
+intensity, stay, every switch, your sound picks, the record pop's place and
+size, and the records window's sort. On the Toolkit's settings page (Options
+> AddOns > Dyre's AddOns), copy them from another character, go back to the
+Defaults, or export and import them as a line of text. A copy applies at
+once, with no reload. Your records stay with each character, and the
+**I'm 18 or over** box stays account-wide: a mature theme copied onto an
+account without the box shows Tame.
+
 ## Commands
 
 - `/dcm`: your records. `/dcm options`: the settings (also under Options >
