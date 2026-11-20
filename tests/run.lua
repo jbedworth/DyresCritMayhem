@@ -645,7 +645,7 @@ end
 
 test("login prints the banner from the TOC and the ready hint", function()
     local state = fixture()
-    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.0 by Dyre")
+    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.1 by Dyre")
     contains(state.messages[2], "Type /dcm for your records")
     equal(#state.messages, 2, "nothing else at login")
 end)
@@ -2642,8 +2642,8 @@ test("Forever: a wound on a unit you cannot attack is a bystander's: its effects
         end
         return count
     end
-    -- High: 5, halved as others' (3); the friendly target has no plate shown.
-    equal(shown(), 3, "the bystander's hit effect plays on its nameplate")
+    -- High: 10, halved as others' (5); the friendly target has no plate shown.
+    equal(shown(), 5, "the bystander's hit effect plays on its nameplate")
     equal(#state.splats(), 1, "its crit splatters your screen, as others' crits")
     equal(next(state.db().records), nil, "no record")
     equal(state.dcm.RecordCountsText():find("hits=0", 1, true) ~= nil, true, "not counted as your hit")
@@ -2672,7 +2672,7 @@ test("Era: a mob's hit on another player's nameplate plays its effects, never a 
             equal(child.points[1][2], state.plateFrames[stranger], "on the stranger's nameplate")
         end
     end
-    equal(count, 7, "High, halved, a crit doubled, and its burst")
+    equal(count, 11, "High, halved, a crit doubled, and its burst")
     equal(#state.splats(), 1, "the crit splatters your screen, as others' crits")
     equal(next(state.db().records), nil)
     state.emit("NAME_PLATE_UNIT_REMOVED", "nameplate5")
@@ -2795,7 +2795,7 @@ test("Spellburst is 18+ now: its crits glow in the school's color, its spell hit
     for _, child in ipairs(state.dcm.hitLayer.children) do
         if child.shown then count = count + 1 end
     end
-    equal(count, math.ceil(5 * 2.5 * 1.4), "High frost, 40% denser")
+    equal(count, math.ceil(10 * 2.5 * 1.4), "High frost, 40% denser")
 end)
 test("Naturalist: earthy tints, leaves blowing from nature crits, and leaves in its nature hits", function()
     local state = fixture()
@@ -2875,7 +2875,7 @@ test("every hit plays its school's effect on the enemy's nameplate; a crit doubl
     onPlate(state, "nameplate1", ENEMY)
     state.swing(PLAYER, ENEMY, 120, false)
     local shown = sprays(state)
-    equal(#shown, 2, "Low: two pieces for a plain hit")
+    equal(#shown, 4, "Low: four pieces for a plain hit")
     local plate = state.plateFrames[ENEMY]
     for _, piece in ipairs(shown) do
         equal(piece.points[1][2], plate, "anchored to the enemy's nameplate")
@@ -2887,7 +2887,7 @@ test("every hit plays its school's effect on the enemy's nameplate; a crit doubl
     state.now = state.now + 1
     state.swing(PLAYER, ENEMY, 300, true)
     local crit = sprays(state)
-    equal(#crit, 5, "a crit doubles it, plus its flash")
+    equal(#crit, 9, "a crit doubles it, plus its flash")
     local flashes = 0
     for _, piece in ipairs(crit) do
         if piece.points[1][4] == 0 and piece.width >= 34 * 3.2 * 0.5 - 0.01 then flashes = flashes + 1 end
@@ -2898,7 +2898,7 @@ test("every hit plays its school's effect on the enemy's nameplate; a crit doubl
     state.now = state.now + 1
     state.mayhem("brutal", "max")
     state.swing(PLAYER, ENEMY, 120, false)
-    equal(#sprays(state), 7, "Total Mayhem: seven")
+    equal(#sprays(state), 14, "Total Mayhem: fourteen")
 end)
 test("hit effects shrink with the enemy's distance, and start well under its nameplate", function()
     local dcm = fixture().dcm
@@ -2939,12 +2939,12 @@ test("hit effects shrink with the enemy's distance, and start well under its nam
 end)
 test("each school has its own hit effect", function()
     local cases = {
-        {school = 16, texture = "Snowflake1", alt = "Shard1", also = "Mote1", name = "frost", count = 13},
+        {school = 16, texture = "Snowflake1", alt = "Shard1", also = "Mote1", name = "frost", count = 25},
         {school = 4, texture = "Smoke", alt = "Burst2", name = "fire"},
         {school = 64, texture = "Sparkle1", alt = "Mote1", name = "arcane"},
         {school = 32, texture = "Smoke", alt = "Smoke", name = "shadow"},
         {school = 2, texture = "Mote1", alt = "Sparkle1", name = "holy"},
-        {school = 8, texture = "Sparkle1", alt = "Mote1", name = "nature", count = 13},
+        {school = 8, texture = "Sparkle1", alt = "Mote1", name = "nature", count = 25},
     }
     for _, case in ipairs(cases) do
         local state = fixture()
@@ -2954,7 +2954,7 @@ test("each school has its own hit effect", function()
         onPlate(state, "nameplate1", ENEMY)
         state.spell(PLAYER, ENEMY, "Bolt", 200, false, nil, case.school)
         local shown = sprays(state)
-        equal(#shown, case.count or 5, case.name .. ": High, five (frost: denser)")
+        equal(#shown, case.count or 10, case.name .. ": High, ten (frost: denser)")
         for _, piece in ipairs(shown) do
             equal(piece.texture:find(case.texture, 1, true) ~= nil or piece.texture:find(case.alt, 1, true) ~= nil
                 or case.also ~= nil and piece.texture:find(case.also, 1, true) ~= nil,
@@ -2987,7 +2987,7 @@ test("each school has its own hit effect", function()
     equal(#sprays(state), 0, "no effect for a nature tick")
     state.now = state.now + 1
     state.spell(PLAYER, ENEMY, "Corruption", 40, false, "SPELL_PERIODIC_DAMAGE", 32)
-    equal(#sprays(state), 2, "other ticks play")
+    equal(#sprays(state), 4, "other ticks play")
 end)
 test("Fel's smoke is green; Tame and None show none", function()
     local state = fixture()
@@ -3015,14 +3015,14 @@ test("hits and heals on you play over your character; heals are green plus signs
     state.mayhem("brutal", "low")
     state.spell(ENEMY, PLAYER, "Frostbolt", 200, false, nil, 16)
     local shown = sprays(state)
-    equal(#shown, 5, "Low frost: two, times 2.5")
+    equal(#shown, 10, "Low frost: four, times 2.5")
     equal(shown[1].points[1][2], state.env.UIParent, "the middle of the screen, where your character is")
     equal(shown[1].points[1][5] < 0, true, "a little under the middle")
     state.dcm.ClearEffects()
     state.now = state.now + 1
     state.heal(state.env.UnitGUID("party1") or "Player-party", PLAYER, "Heal", 300, true)
     shown = sprays(state)
-    equal(#shown, 5, "a crit heal: doubled, plus a green glow")
+    equal(#shown, 9, "a crit heal: doubled, plus a green glow")
     for _, piece in ipairs(shown) do
         equal(piece.texture:find("Plus1", 1, true) ~= nil or piece.texture:find("Burst1", 1, true) ~= nil, true,
             piece.texture)
@@ -3057,17 +3057,17 @@ test("Forever: every wound on a nameplate plays, crits double, and the effects g
     local amount = secret()
     state.secrets[amount] = true
     state.emit("UNIT_COMBAT", "nameplate2", "WOUND", "", amount, 1)
-    equal(#sprays(state), 3, "Medium: three, with a secret amount too")
+    equal(#sprays(state), 6, "Medium: six, with a secret amount too")
     equal(sprays(state)[1].points[1][2], state.plateFrames[ENEMY])
     state.now = state.now + 1
     state.emit("UNIT_COMBAT", "nameplate2", "WOUND", "CRITICAL", amount, 16)
-    equal(#sprays(state), 3 + 16 + 1, "a frost crit: three times 2.5, doubled, and its flash")
+    equal(#sprays(state), 6 + 30 + 1, "a frost crit: six times 2.5, doubled, and its flash")
     state.emit("NAME_PLATE_UNIT_REMOVED", "nameplate2")
     equal(#sprays(state), 0, "the plate is reused: its effects go")
     -- Hits and heals on you.
     state.now = state.now + 1
     state.emit("UNIT_COMBAT", "player", "WOUND", "", amount, 4)
-    equal(#sprays(state), 3)
+    equal(#sprays(state), 6)
     state.dcm.ClearEffects()
     state.now = state.now + 1
     state.emit("UNIT_COMBAT", "player", "HEAL", "", amount, 2)
@@ -3078,7 +3078,7 @@ test("Forever: every wound on a nameplate plays, crits double, and the effects g
     onPlate(state, "nameplate2", ENEMY)
     state.now = state.now + 1
     state.emit("UNIT_COMBAT", "nameplate2", "WOUND", "", 300, 1)
-    equal(#sprays(state), 2)
+    equal(#sprays(state), 3)
 end)
 test("Forever, in a group: crits on your target and enemy nameplates play by the setting, never a record",
         function()

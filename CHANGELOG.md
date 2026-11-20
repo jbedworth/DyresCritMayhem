@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+### Other changes
+
+- Hit effects on enemies and on you are twice as dense at every intensity (Low 4 pieces, Medium 6, High 10, Total Mayhem 14; a crit still doubles them), so they show in a fight.
+
 ## 0.3.0
 
 ### Features

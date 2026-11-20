@@ -83,13 +83,15 @@ local VIGNETTE_FADE = 3
 -- at most OTHERS_HITS per OTHERS_WINDOW); one set per target per HIT_GAP
 -- unless it crits. AVATAR_Y: your character's body below the screen's
 -- center, as a part of its height (no nameplate of your own).
-local MAX_HITS = 120
+local MAX_HITS = 240
 local SPRAY_SIZE = 34
 -- The body below an enemy's nameplate (author: "about 2x further down, so
 -- it looks like it's coming from the mob, instead of sitting on top of it's
 -- head"), at full size.
 local SPRAY_DROP = -76
-local HIT_COUNT = {low = 2, medium = 3, high = 5, max = 7}
+-- Doubled after play testing (John, 2026-11-19: on Medium he "can barely
+-- notice the on-mob (and on-me) spatters. Let's double the intensity").
+local HIT_COUNT = {low = 4, medium = 6, high = 10, max = 14}
 local HIT_CRIT_SIZE = 1.6
 local HIT_CRIT_REACH = 1.5
 -- An upright style's pieces (flames) tilt at most this far, in radians.
