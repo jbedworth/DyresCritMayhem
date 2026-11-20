@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2
+
+### Other changes
+
+- Hit effects at High and Total Mayhem are much denser: High 20 pieces (was 10) and Total Mayhem 56 (was 14), four and eight times 0.3.0's. Low and Medium stay at 4 and 6. A crit still doubles them.
+
 ## 0.3.1
 
 ### Other changes

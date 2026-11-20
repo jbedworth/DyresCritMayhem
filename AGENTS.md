@@ -259,8 +259,9 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
   blood needs the 18+ box, else `impact`; an unknown or secret school is
   physical. Nature `SPELL_PERIODIC_DAMAGE` shows nothing (the game's own
   poison cloud); Forever's `UNIT_COMBAT` cannot tell ticks apart. Pieces:
-  Low 4, Medium 6, High 10, Total Mayhem 14 (doubled; John, 2026-11-19: on
-  Medium he "can barely notice" them), times a style's `count`
+  Low 4, Medium 6, High 20, Total Mayhem 56 (2x, 2x, 4x, 8x the first 2,
+  3, 5, 7; John, 2026-11-19: on Medium he "can barely notice" them, then
+  2026-11-20: "still too subtle at high and max"), times a style's `count`
   (frost and nature 2.5: fine motes, with small flakes and shards for
   frost and small sparks for nature; John: "denser ... more subtle", "Do
   the same for nature"); a crit (John, after play
@@ -275,7 +276,8 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
   heal on your target, its plate when one shows; you: your own nameplate
   if the client shows one, else UIParent's center, 5% of its height
   below (where the camera keeps your character). Own frame `hitLayer`
-  (BACKGROUND), pool of 240. Distance (John: "within 1-3 meters, use the
+  (BACKGROUND), pool of 480 (one Total Mayhem frost crit is 280 pieces;
+  it grows only as play needs it). Distance (John: "within 1-3 meters, use the
   current size, if the mob is 30m away, it should be much smaller"):
   `DCM.UnitDistance` probes nearest first, CheckInteractDistance 3 and 4
   (about 10 and 28 yd) and `C_Item.IsItemInRange` on LibRangeCheck-3.0's

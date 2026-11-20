@@ -645,7 +645,7 @@ end
 
 test("login prints the banner from the TOC and the ready hint", function()
     local state = fixture()
-    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.1 by Dyre")
+    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.2 by Dyre")
     contains(state.messages[2], "Type /dcm for your records")
     equal(#state.messages, 2, "nothing else at login")
 end)
@@ -2642,8 +2642,8 @@ test("Forever: a wound on a unit you cannot attack is a bystander's: its effects
         end
         return count
     end
-    -- High: 10, halved as others' (5); the friendly target has no plate shown.
-    equal(shown(), 5, "the bystander's hit effect plays on its nameplate")
+    -- High: 20, halved as others' (10); the friendly target has no plate shown.
+    equal(shown(), 10, "the bystander's hit effect plays on its nameplate")
     equal(#state.splats(), 1, "its crit splatters your screen, as others' crits")
     equal(next(state.db().records), nil, "no record")
     equal(state.dcm.RecordCountsText():find("hits=0", 1, true) ~= nil, true, "not counted as your hit")
@@ -2672,7 +2672,7 @@ test("Era: a mob's hit on another player's nameplate plays its effects, never a 
             equal(child.points[1][2], state.plateFrames[stranger], "on the stranger's nameplate")
         end
     end
-    equal(count, 11, "High, halved, a crit doubled, and its burst")
+    equal(count, 21, "High, halved, a crit doubled, and its burst")
     equal(#state.splats(), 1, "the crit splatters your screen, as others' crits")
     equal(next(state.db().records), nil)
     state.emit("NAME_PLATE_UNIT_REMOVED", "nameplate5")
@@ -2795,7 +2795,7 @@ test("Spellburst is 18+ now: its crits glow in the school's color, its spell hit
     for _, child in ipairs(state.dcm.hitLayer.children) do
         if child.shown then count = count + 1 end
     end
-    equal(count, math.ceil(10 * 2.5 * 1.4), "High frost, 40% denser")
+    equal(count, math.ceil(20 * 2.5 * 1.4), "High frost, 40% denser")
 end)
 test("Naturalist: earthy tints, leaves blowing from nature crits, and leaves in its nature hits", function()
     local state = fixture()
@@ -2898,7 +2898,7 @@ test("every hit plays its school's effect on the enemy's nameplate; a crit doubl
     state.now = state.now + 1
     state.mayhem("brutal", "max")
     state.swing(PLAYER, ENEMY, 120, false)
-    equal(#sprays(state), 14, "Total Mayhem: fourteen")
+    equal(#sprays(state), 56, "Total Mayhem: 56 (8x the first 7)")
 end)
 test("hit effects shrink with the enemy's distance, and start well under its nameplate", function()
     local dcm = fixture().dcm
@@ -2939,12 +2939,12 @@ test("hit effects shrink with the enemy's distance, and start well under its nam
 end)
 test("each school has its own hit effect", function()
     local cases = {
-        {school = 16, texture = "Snowflake1", alt = "Shard1", also = "Mote1", name = "frost", count = 25},
+        {school = 16, texture = "Snowflake1", alt = "Shard1", also = "Mote1", name = "frost", count = 50},
         {school = 4, texture = "Smoke", alt = "Burst2", name = "fire"},
         {school = 64, texture = "Sparkle1", alt = "Mote1", name = "arcane"},
         {school = 32, texture = "Smoke", alt = "Smoke", name = "shadow"},
         {school = 2, texture = "Mote1", alt = "Sparkle1", name = "holy"},
-        {school = 8, texture = "Sparkle1", alt = "Mote1", name = "nature", count = 25},
+        {school = 8, texture = "Sparkle1", alt = "Mote1", name = "nature", count = 50},
     }
     for _, case in ipairs(cases) do
         local state = fixture()
@@ -2954,7 +2954,7 @@ test("each school has its own hit effect", function()
         onPlate(state, "nameplate1", ENEMY)
         state.spell(PLAYER, ENEMY, "Bolt", 200, false, nil, case.school)
         local shown = sprays(state)
-        equal(#shown, case.count or 10, case.name .. ": High, ten (frost: denser)")
+        equal(#shown, case.count or 20, case.name .. ": High, twenty (frost: denser)")
         for _, piece in ipairs(shown) do
             equal(piece.texture:find(case.texture, 1, true) ~= nil or piece.texture:find(case.alt, 1, true) ~= nil
                 or case.also ~= nil and piece.texture:find(case.also, 1, true) ~= nil,

@@ -83,15 +83,19 @@ local VIGNETTE_FADE = 3
 -- at most OTHERS_HITS per OTHERS_WINDOW); one set per target per HIT_GAP
 -- unless it crits. AVATAR_Y: your character's body below the screen's
 -- center, as a part of its height (no nameplate of your own).
-local MAX_HITS = 240
+-- 480 so one Total Mayhem frost crit (56 x 2.5, doubled: 280 pieces) fits
+-- with room; the pool grows only as far as play needs it.
+local MAX_HITS = 480
 local SPRAY_SIZE = 34
 -- The body below an enemy's nameplate (author: "about 2x further down, so
 -- it looks like it's coming from the mob, instead of sitting on top of it's
 -- head"), at full size.
 local SPRAY_DROP = -76
 -- Doubled after play testing (John, 2026-11-19: on Medium he "can barely
--- notice the on-mob (and on-me) spatters. Let's double the intensity").
-local HIT_COUNT = {low = 4, medium = 6, high = 10, max = 14}
+-- notice the on-mob (and on-me) spatters. Let's double the intensity"),
+-- then 2026-11-20: "still too subtle at high and max ... change the
+-- multiplier to 4x at high, and 8x at max" (of the first 2, 3, 5, 7).
+local HIT_COUNT = {low = 4, medium = 6, high = 20, max = 56}
 local HIT_CRIT_SIZE = 1.6
 local HIT_CRIT_REACH = 1.5
 -- An upright style's pieces (flames) tilt at most this far, in radians.
