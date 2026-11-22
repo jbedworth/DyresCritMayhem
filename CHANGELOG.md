@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.5
+
+### Other changes
+
+- Hit effects on a nameplate reach lower down the body: the middle spot is 10 px lower and the bottom spot 30 px lower (71, 111, and 161 px under the nameplate, scaled by distance). The top spot stays where it was.
+
 ## 0.3.4
 
 ### Other changes

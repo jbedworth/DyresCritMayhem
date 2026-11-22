@@ -182,7 +182,8 @@ in, and BugSack on to catch errors.
    fall through the body, snow drifts and turns, sparks burst, smoke
    rises, holy throws golden sparkles (no ring). The effect starts at
    the mob's mid-body, well under its nameplate: a plain hit at one of
-   three spots 30 px apart (they change from hit to hit), a crit at all
+   three spots, 71, 111, and 161 px under the plate up close (they change
+   from hit to hit), a crit at all
    three with one burst on the middle spot. Distance: hit a mob up
    close, then one at 30 yd (a ranged pull or a wand): the far one's
    effect is much smaller, and nearer its plate. Is the spot on the body right, or too high

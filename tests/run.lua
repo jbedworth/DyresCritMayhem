@@ -647,7 +647,7 @@ end
 
 test("login prints the banner from the TOC and the ready hint", function()
     local state = fixture()
-    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.4 by Dyre")
+    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.5 by Dyre")
     contains(state.messages[2], "Type /dcm for your records")
     equal(#state.messages, 2, "nothing else at login")
 end)
@@ -2931,9 +2931,10 @@ test("a plate's hit plays mid-body: a normal hit at one of three spots, a crit a
     end
     table.sort(ys)
     equal(#ys, 3, "three spots")
-    local scale = (ys[3] - ys[2]) / 30
-    equal(near(ys[2] - ys[1], 30 * scale), true, "30 px apart, scaled by distance")
-    equal(near(ys[2], -101 * scale), true, "the middle spot 101 px under the plate: " .. ys[2])
+    local scale = (ys[3] - ys[2]) / 40
+    equal(near(ys[3], -71 * scale), true, "the top spot 71 px under the plate: " .. ys[3])
+    equal(near(ys[2], -111 * scale), true, "the middle spot 111 px under the plate: " .. ys[2])
+    equal(near(ys[1], -161 * scale), true, "the bottom spot 161 px under the plate: " .. ys[1])
     equal(near(flash.points[1][5], ys[2]), true, "one flash, on the middle spot")
     state.dcm.ClearEffects()
     state.now = state.now + 1
@@ -2969,7 +2970,7 @@ test("hit effects shrink with the enemy's distance, and start well under its nam
         equal(sizes[index] < sizes[index - 1], true, "smaller farther away: " .. index)
         equal(drops[index] > drops[index - 1], true, "nearer the plate farther away: " .. index)
     end
-    equal(drops[1] <= -101, true, "101 px or more under the plate up close")
+    equal(drops[1] <= -111, true, "111 px or more under the plate up close")
     -- In combat, a unit you cannot attack is never range-checked (the client
     -- blocks it): no distance, so full size, and no error.
     local state = fixture({restrictCombatLog = true})

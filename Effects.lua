@@ -92,12 +92,15 @@ local SPRAY_SIZE = 34
 -- it looks like it's coming from the mob, instead of sitting on top of it's
 -- head"), at full size.
 -- Then 25 px lower (John, 2026-11-21: "aiming for mid-body instead of on
--- their faces"), with SPOT_GAP spots above and below it: a normal hit plays
+-- their faces"), with spots above and below it: a normal hit plays
 -- at one of the three at random, a crit at all three (CRIT_SPOT_COUNT
 -- pieces at each; John: "100 pieces at each spot") with one flash on the
--- middle spot. Scaled by distance like the drop.
-local SPRAY_DROP = -101
-local SPOT_GAP = 30
+-- middle spot. Scaled by distance like the drop. Then (John, 2026-11-21:
+-- "Add another 30px to the bottom, and 10px to the middle"): top 71,
+-- middle 111, bottom 161 px under the plate's center.
+local SPRAY_DROP = -111
+local SPOT_ABOVE = 40
+local SPOT_BELOW = 50
 -- Doubled after play testing (John, 2026-11-19: on Medium he "can barely
 -- notice the on-mob (and on-me) spatters. Let's double the intensity"),
 -- then 2026-11-20: "still too subtle at high and max ... change the
@@ -713,7 +716,7 @@ function DCM.PlayHit(hit)
     -- character without a plate keeps its one spot.
     local spots = {body}
     if unit then
-        spots = {body, body + SPOT_GAP * scale, body - SPOT_GAP * scale}
+        spots = {body, body + SPOT_ABOVE * scale, body - SPOT_BELOW * scale}
         if not hit.crit then
             spots = {spots[DCM.random(3)]}
         end

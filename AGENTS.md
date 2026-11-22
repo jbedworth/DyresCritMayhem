@@ -267,7 +267,9 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
   the same for nature"). Spots (John, 2026-11-21: "a 2nd and 3rd affect
   30px above and 30px below it ... crits do all 3 hit boxes; and then
   randomly pick between the 3 for normal hits"): on a nameplate, the
-  middle spot and `SPOT_GAP` (30 px) above and below it, scaled by
+  middle spot, one `SPOT_ABOVE` (40 px) above it and one `SPOT_BELOW`
+  (50 px) below it (John: "Add another 30px to the bottom, and 10px to the
+  middle"; at full size 71, 111, and 161 px under the plate), scaled by
   distance; a normal hit at one at random, a crit at all three with
   `CRIT_SPOT_COUNT` at each (Low 7, Medium 11, High 36, Total Mayhem 100:
   John's 100, the rest in the ratio 100 / 56), times the style's count; a
@@ -280,9 +282,10 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
   in 0.45 s (a blood burst for physical; a glow or smoke puff in
   the school's colors otherwise); a new record +3; one set per target per 0.1 s unless
   it crits. Anchor: an enemy's nameplate (`C_NamePlate.GetNamePlateForUnit`;
-  secret, missing, or `IsForbidden` skip it), 101 px under its center (John:
+  secret, missing, or `IsForbidden` skip it), 111 px under its center (John:
   "about 2x further down, so it looks like it's coming from the mob", then
-  25 px more, "aiming for mid-body instead of on their faces"); a
+  25 px more, "aiming for mid-body instead of on their faces", then 10 px
+  more); a
   heal on your target, its plate when one shows; you: your own nameplate
   if the client shows one, else UIParent's center, 5% of its height
   below (where the camera keeps your character). Own frame `hitLayer`
