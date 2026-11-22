@@ -264,20 +264,30 @@ commands `/dcm` and `/critmayhem` (backup); chat prefix `DCM:`.
   2026-11-20: "still too subtle at high and max"), times a style's `count`
   (frost and nature 2.5: fine motes, with small flakes and shards for
   frost and small sparks for nature; John: "denser ... more subtle", "Do
-  the same for nature"); a crit (John, after play
-  testing: "crits are not visibly discernable from normal hits") doubles
-  them, makes them 60% bigger, sends them 50% farther, and adds the
+  the same for nature"). Spots (John, 2026-11-21: "a 2nd and 3rd affect
+  30px above and 30px below it ... crits do all 3 hit boxes; and then
+  randomly pick between the 3 for normal hits"): on a nameplate, the
+  middle spot and `SPOT_GAP` (30 px) above and below it, scaled by
+  distance; a normal hit at one at random, a crit at all three with
+  `CRIT_SPOT_COUNT` at each (Low 7, Medium 11, High 36, Total Mayhem 100:
+  John's 100, the rest in the ratio 100 / 56), times the style's count; a
+  new record's +3 and the one flash on the middle spot. Your character
+  without a plate has one spot (a crit there: `CRIT_SPOT_COUNT` once). A
+  crit (John, after play
+  testing: "crits are not visibly discernable from normal hits") makes them
+  60% bigger, sends them 50% farther, and adds the
   style's `flash`, one big piece at the impact that swells 1.5x and fades
   in 0.45 s (a blood burst for physical; a glow or smoke puff in
   the school's colors otherwise); a new record +3; one set per target per 0.1 s unless
   it crits. Anchor: an enemy's nameplate (`C_NamePlate.GetNamePlateForUnit`;
-  secret, missing, or `IsForbidden` skip it), 76 px under its center (John:
-  "about 2x further down, so it looks like it's coming from the mob"); a
+  secret, missing, or `IsForbidden` skip it), 101 px under its center (John:
+  "about 2x further down, so it looks like it's coming from the mob", then
+  25 px more, "aiming for mid-body instead of on their faces"); a
   heal on your target, its plate when one shows; you: your own nameplate
   if the client shows one, else UIParent's center, 5% of its height
   below (where the camera keeps your character). Own frame `hitLayer`
-  (BACKGROUND), pool of 480 (one Total Mayhem frost crit is 280 pieces;
-  it grows only as play needs it). Distance (John: "within 1-3 meters, use the
+  (BACKGROUND), pool of 1200 (one Total Mayhem frost crit is 751 pieces,
+  Spellburst's 1051; it grows only as play needs it). Distance (John: "within 1-3 meters, use the
   current size, if the mob is 30m away, it should be much smaller"):
   `DCM.UnitDistance` probes nearest first, CheckInteractDistance 3 and 4
   (about 10 and 28 yd) and `C_Item.IsItemInRange` on LibRangeCheck-3.0's

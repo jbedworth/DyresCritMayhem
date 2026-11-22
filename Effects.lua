@@ -83,19 +83,29 @@ local VIGNETTE_FADE = 3
 -- at most OTHERS_HITS per OTHERS_WINDOW); one set per target per HIT_GAP
 -- unless it crits. AVATAR_Y: your character's body below the screen's
 -- center, as a part of its height (no nameplate of your own).
--- 480 so one Total Mayhem frost crit (56 x 2.5, doubled: 280 pieces) fits
--- with room; the pool grows only as far as play needs it.
-local MAX_HITS = 480
+-- 1200 so one Total Mayhem crit at its three spots fits: frost 100 x 2.5 x
+-- 3 = 750 pieces, Spellburst's frost (x 1.4) 1050, plus the flash and a
+-- record's; the pool grows only as far as play needs it.
+local MAX_HITS = 1200
 local SPRAY_SIZE = 34
 -- The body below an enemy's nameplate (author: "about 2x further down, so
 -- it looks like it's coming from the mob, instead of sitting on top of it's
 -- head"), at full size.
-local SPRAY_DROP = -76
+-- Then 25 px lower (John, 2026-11-21: "aiming for mid-body instead of on
+-- their faces"), with SPOT_GAP spots above and below it: a normal hit plays
+-- at one of the three at random, a crit at all three (CRIT_SPOT_COUNT
+-- pieces at each; John: "100 pieces at each spot") with one flash on the
+-- middle spot. Scaled by distance like the drop.
+local SPRAY_DROP = -101
+local SPOT_GAP = 30
 -- Doubled after play testing (John, 2026-11-19: on Medium he "can barely
 -- notice the on-mob (and on-me) spatters. Let's double the intensity"),
 -- then 2026-11-20: "still too subtle at high and max ... change the
 -- multiplier to 4x at high, and 8x at max" (of the first 2, 3, 5, 7).
 local HIT_COUNT = {low = 4, medium = 6, high = 20, max = 56}
+-- A crit's pieces at each of its spots, before a style's count: Total
+-- Mayhem 100 (John), the others in the same ratio to HIT_COUNT (100 / 56).
+local CRIT_SPOT_COUNT = {low = 7, medium = 11, high = 36, max = 100}
 local HIT_CRIT_SIZE = 1.6
 local HIT_CRIT_REACH = 1.5
 -- An upright style's pieces (flames) tilt at most this far, in radians.
@@ -650,6 +660,8 @@ function DCM.Look(theme, kind)
     return theme
 end
 
+local DrawHitPiece, DrawHitFlash
+
 -- One hit's effect on its target. hit: {kind = "mine" | "pet" | "others" |
 -- "taken" | "self", unit, school, crit, big, heal}. Every theme but Tame and None
 -- (author: "Tame gets none of these on target effects for now"); a crit
@@ -672,7 +684,7 @@ function DCM.PlayHit(hit)
     end
     local intensity = DCM.Intensity()
     local now = Now()
-    local count = HIT_COUNT[intensity.key] or 2
+    local count = hit.crit and CRIT_SPOT_COUNT[intensity.key] or HIT_COUNT[intensity.key] or 2
     if hit.kind == "others" then
         -- Others' hits: fewer, and at most OTHERS_HITS by intensity in any
         -- OTHERS_WINDOW, so a raid cannot flood the pool.
@@ -697,101 +709,117 @@ function DCM.PlayHit(hit)
     local style, colors = HitStyle(look, hit.school, hit.heal)
     -- emphasis: a variant's stronger school (Spellburst's spells).
     count = math.ceil(count * (style.count or 1) * (style.emphasis or 1))
-    if hit.crit then
-        count = count * 2
-    end
-    if hit.big then
-        count = count + HIT_BIG
+    -- A nameplate's three spots, the middle one first (the flash's); your
+    -- character without a plate keeps its one spot.
+    local spots = {body}
+    if unit then
+        spots = {body, body + SPOT_GAP * scale, body - SPOT_GAP * scale}
+        if not hit.crit then
+            spots = {spots[DCM.random(3)]}
+        end
     end
     local motion = HIT_MOTIONS[style.motion]
-    for _ = 1, count do
-        local texture = Pick(style.textures)
-        local tint = style.textureColors and style.textureColors[texture] or Pick(colors)
-        local item = TakeHit()
-        item.group:Stop()
-        item.unit = unit
-        item:SetTexture(texture)
-        item:SetBlendMode(style.blend)
-        item:SetVertexColor(tint[1], tint[2], tint[3])
-        local size = SPRAY_SIZE * style.size * intensity.size * (hit.crit and HIT_CRIT_SIZE or 1)
-            * Between(0.6, 1.2) * scale
-        item:SetSize(size, size)
-        if type(item.SetRotation) == "function" then
-            item:SetRotation(style.upright and Between(-UPRIGHT_TILT, UPRIGHT_TILT) or Between(0, 2 * math.pi))
+    for index, spot in ipairs(spots) do
+        local pieces = count + (hit.big and index == 1 and HIT_BIG or 0)
+        for _ = 1, pieces do
+            DrawHitPiece(hit, style, colors, motion, intensity, anchor, spot, unit, scale)
         end
-        item:ClearAllPoints()
-        item:SetPoint("CENTER", anchor, "CENTER", Between(-motion.spread, motion.spread) * scale,
-            body + (motion.startY + Between(-motion.spread, motion.spread) / 2) * scale)
-        local x, y
-        if motion.angle then
-            local angle = Between(motion.angle[1], motion.angle[2])
-            local distance = Between(motion.distance[1], motion.distance[2])
-            x, y = math.cos(angle) * distance, math.sin(angle) * distance * 0.5 - motion.fall
-        else
-            x, y = Between(motion.x[1], motion.x[2]), Between(motion.y[1], motion.y[2])
-        end
-        if hit.crit then
-            x, y = x * HIT_CRIT_REACH, y * HIT_CRIT_REACH
-        end
-        x, y = x * scale, y * scale
-        item.fly:SetDuration(motion.seconds)
-        item.fly:SetOffset(x, y)
-        item.spin:SetDuration(motion.seconds)
-        if type(item.spin.SetDegrees) == "function" then
-            item.spin:SetDegrees(motion.turn and Between(-motion.turn, motion.turn) or 0)
-        end
-        item.grow:SetDuration(motion.seconds)
-        if type(item.grow.SetScaleFrom) == "function" then
-            item.grow:SetScaleFrom(1, 1)
-            if motion.stretch then
-                item.grow:SetScaleTo(motion.stretch[1], motion.stretch[2])
-            else
-                item.grow:SetScaleTo(motion.grow or 1, motion.grow or 1)
-            end
-        end
-        Shape(item, motion.origin, motion.popFrom, motion.popSeconds)
-        item.fade:SetStartDelay(motion.seconds * motion.fadeAt)
-        item.fade:SetDuration(motion.seconds * (1 - motion.fadeAt))
-        item:SetAlpha(1)
-        item:Show()
-        item.group:Play()
     end
     if hit.crit and style.flash then
-        -- The crit's flash, under nothing else: one big piece at the impact.
-        local flash = style.flash
-        local tint = Pick(colors)
-        local item = TakeHit()
-        item.group:Stop()
-        item.unit = unit
-        item:SetTexture(flash.texture)
-        item:SetBlendMode(flash.blend)
-        item:SetVertexColor(tint[1], tint[2], tint[3])
-        local size = SPRAY_SIZE * flash.size * (style.flashScale or 1) * intensity.size
-            * (hit.big and BIG_SIZE or 1) * scale
-        item:SetSize(size, size)
-        if type(item.SetRotation) == "function" then
-            item:SetRotation(Between(0, 2 * math.pi))
-        end
-        item:ClearAllPoints()
-        item:SetPoint("CENTER", anchor, "CENTER", 0, body)
-        item.fly:SetDuration(FLASH_SECONDS)
-        item.fly:SetOffset(0, 0)
-        item.spin:SetDuration(FLASH_SECONDS)
-        if type(item.spin.SetDegrees) == "function" then
-            item.spin:SetDegrees(0)
-        end
-        item.grow:SetDuration(FLASH_SECONDS)
-        if type(item.grow.SetScaleFrom) == "function" then
-            item.grow:SetScaleFrom(1, 1)
-            item.grow:SetScaleTo(FLASH_GROW, FLASH_GROW)
-        end
-        Shape(item, nil, nil, nil)
-        item.fade:SetStartDelay(FLASH_SECONDS * FLASH_FADE_AT)
-        item.fade:SetDuration(FLASH_SECONDS * (1 - FLASH_FADE_AT))
-        item:SetAlpha(1)
-        item:Show()
-        item.group:Play()
+        DrawHitFlash(hit, style, colors, intensity, anchor, body, unit, scale)
     end
+end
+
+-- One flying piece of a hit at its spot (body: the spot's offset below the
+-- anchor).
+function DrawHitPiece(hit, style, colors, motion, intensity, anchor, body, unit, scale)
+    local texture = Pick(style.textures)
+    local tint = style.textureColors and style.textureColors[texture] or Pick(colors)
+    local item = TakeHit()
+    item.group:Stop()
+    item.unit = unit
+    item:SetTexture(texture)
+    item:SetBlendMode(style.blend)
+    item:SetVertexColor(tint[1], tint[2], tint[3])
+    local size = SPRAY_SIZE * style.size * intensity.size * (hit.crit and HIT_CRIT_SIZE or 1)
+        * Between(0.6, 1.2) * scale
+    item:SetSize(size, size)
+    if type(item.SetRotation) == "function" then
+        item:SetRotation(style.upright and Between(-UPRIGHT_TILT, UPRIGHT_TILT) or Between(0, 2 * math.pi))
+    end
+    item:ClearAllPoints()
+    item:SetPoint("CENTER", anchor, "CENTER", Between(-motion.spread, motion.spread) * scale,
+        body + (motion.startY + Between(-motion.spread, motion.spread) / 2) * scale)
+    local x, y
+    if motion.angle then
+        local angle = Between(motion.angle[1], motion.angle[2])
+        local distance = Between(motion.distance[1], motion.distance[2])
+        x, y = math.cos(angle) * distance, math.sin(angle) * distance * 0.5 - motion.fall
+    else
+        x, y = Between(motion.x[1], motion.x[2]), Between(motion.y[1], motion.y[2])
+    end
+    if hit.crit then
+        x, y = x * HIT_CRIT_REACH, y * HIT_CRIT_REACH
+    end
+    x, y = x * scale, y * scale
+    item.fly:SetDuration(motion.seconds)
+    item.fly:SetOffset(x, y)
+    item.spin:SetDuration(motion.seconds)
+    if type(item.spin.SetDegrees) == "function" then
+        item.spin:SetDegrees(motion.turn and Between(-motion.turn, motion.turn) or 0)
+    end
+    item.grow:SetDuration(motion.seconds)
+    if type(item.grow.SetScaleFrom) == "function" then
+        item.grow:SetScaleFrom(1, 1)
+        if motion.stretch then
+            item.grow:SetScaleTo(motion.stretch[1], motion.stretch[2])
+        else
+            item.grow:SetScaleTo(motion.grow or 1, motion.grow or 1)
+        end
+    end
+    Shape(item, motion.origin, motion.popFrom, motion.popSeconds)
+    item.fade:SetStartDelay(motion.seconds * motion.fadeAt)
+    item.fade:SetDuration(motion.seconds * (1 - motion.fadeAt))
+    item:SetAlpha(1)
+    item:Show()
+    item.group:Play()
+end
+
+-- The crit's flash, under nothing else: one big piece at the middle spot.
+function DrawHitFlash(hit, style, colors, intensity, anchor, body, unit, scale)
+    local flash = style.flash
+    local tint = Pick(colors)
+    local item = TakeHit()
+    item.group:Stop()
+    item.unit = unit
+    item:SetTexture(flash.texture)
+    item:SetBlendMode(flash.blend)
+    item:SetVertexColor(tint[1], tint[2], tint[3])
+    local size = SPRAY_SIZE * flash.size * (style.flashScale or 1) * intensity.size
+        * (hit.big and BIG_SIZE or 1) * scale
+    item:SetSize(size, size)
+    if type(item.SetRotation) == "function" then
+        item:SetRotation(Between(0, 2 * math.pi))
+    end
+    item:ClearAllPoints()
+    item:SetPoint("CENTER", anchor, "CENTER", 0, body)
+    item.fly:SetDuration(FLASH_SECONDS)
+    item.fly:SetOffset(0, 0)
+    item.spin:SetDuration(FLASH_SECONDS)
+    if type(item.spin.SetDegrees) == "function" then
+        item.spin:SetDegrees(0)
+    end
+    item.grow:SetDuration(FLASH_SECONDS)
+    if type(item.grow.SetScaleFrom) == "function" then
+        item.grow:SetScaleFrom(1, 1)
+        item.grow:SetScaleTo(FLASH_GROW, FLASH_GROW)
+    end
+    Shape(item, nil, nil, nil)
+    item.fade:SetStartDelay(FLASH_SECONDS * FLASH_FADE_AT)
+    item.fade:SetDuration(FLASH_SECONDS * (1 - FLASH_FADE_AT))
+    item:SetAlpha(1)
+    item:Show()
+    item.group:Play()
 end
 
 -- The school of a hit for /dcm test: the effect on your target's nameplate,

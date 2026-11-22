@@ -66,7 +66,7 @@ Brutal's wounds take on the damage school (physical, holy, fire, nature, frost, 
 - **Low**, **Medium**, **High**, **Total Mayhem**: each step is more, bigger, and stays longer. The **None** theme turns every effect off.
 - **Stays on screen**: 25% to 300% of your intensity's time (about 2.5 seconds at Low to 12 at Total Mayhem), with the seconds shown.
 - Effects land under your action bars and unit frames, never in the middle of the screen, and fade on their own. Sounds and on-screen effects each have a switch.
-- **Hit effects**: with enemy nameplates on, every hit plays its school's effect on the enemy, following it: blood, snow and ice, bursts of flame, sparks, smoke, golden sparkles, and green plus signs for heals. A crit doubles it. Hits and heals on you play over your character.
+- **Hit effects**: with enemy nameplates on, every hit plays its school's effect on the enemy, following it: blood, snow and ice, bursts of flame, sparks, smoke, golden sparkles, and green plus signs for heals. Hits land at spots down the body; a crit fills them all. Hits and heals on you play over your character.
 
 ### Which crits
 Yours (on by default), others' crits on your target or on nearby enemies (Off, My target, or Nearby enemies; trimmed so a raid stays readable; records stay yours), your pet's, crits on you (blood at the edges of the screen), and crit heals, shown as gentle rising light in your theme's style (hearts on Tame, warm red and gold on Brutal, holy and nature light on Spellburst, fel-green wisps on Fel, vines and green and gold smoke on Naturalist).

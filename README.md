@@ -75,8 +75,9 @@ built but unconfirmed until Forever launches (see Compatibility).
   nameplate down over its body, following it: a blood spray for physical
   (18+), snow and ice for frost, the body burning for fire, sparks for
   arcane and nature, smoke for shadow, golden sparkles for holy, and green
-  plus signs for heals, in your theme's style for your own damage. A crit
-  doubles it. The game draws its own green cloud on a poisoned mob, so
+  plus signs for heals, in your theme's style for your own damage. Each
+  hit lands at one of three spots down the mob's body; a crit fills all
+  three, with a big burst in the middle. The game draws its own green cloud on a poisoned mob, so
   nature damage over time adds nothing. AddOns cannot draw on the mob
   itself, so this needs enemy nameplates on (V). Not in Tame yet.
 - **Hit effects on you** (on by default): the same when you are hit or

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3
+
+### Other changes
+
+- Hit effects on a nameplate play mid-body, 25 px lower than before, at three spots 30 px apart (all scaled by distance). A normal hit plays at one spot picked at random. A crit plays at all three, with 100 pieces at each spot at Total Mayhem (Low 7, Medium 11, High 36), and one flash on the middle spot. Hits on you without a nameplate keep their one spot.
+
 ## 0.3.2
 
 ### Other changes

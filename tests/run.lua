@@ -645,7 +645,7 @@ end
 
 test("login prints the banner from the TOC and the ready hint", function()
     local state = fixture()
-    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.2 by Dyre")
+    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.3 by Dyre")
     contains(state.messages[2], "Type /dcm for your records")
     equal(#state.messages, 2, "nothing else at login")
 end)
@@ -2672,7 +2672,7 @@ test("Era: a mob's hit on another player's nameplate plays its effects, never a 
             equal(child.points[1][2], state.plateFrames[stranger], "on the stranger's nameplate")
         end
     end
-    equal(count, 21, "High, halved, a crit doubled, and its burst")
+    equal(count, 18 * 3 + 1, "High's crit, halved (36 / 2), at three spots, and its burst")
     equal(#state.splats(), 1, "the crit splatters your screen, as others' crits")
     equal(next(state.db().records), nil)
     state.emit("NAME_PLATE_UNIT_REMOVED", "nameplate5")
@@ -2865,7 +2865,7 @@ local function onPlate(state, unit, guid)
     state.emit("NAME_PLATE_UNIT_ADDED", unit)
 end
 
-test("every hit plays its school's effect on the enemy's nameplate; a crit doubles it", function()
+test("every hit plays its school's effect on the enemy's nameplate; a crit plays at three spots", function()
     local state = fixture()
     state.mayhem("brutal", "low")
     equal(state.db().spray, true, "on by default")
@@ -2887,7 +2887,7 @@ test("every hit plays its school's effect on the enemy's nameplate; a crit doubl
     state.now = state.now + 1
     state.swing(PLAYER, ENEMY, 300, true)
     local crit = sprays(state)
-    equal(#crit, 9, "a crit doubles it, plus its flash")
+    equal(#crit, 7 * 3 + 1, "a crit: Low's 7 at each of three spots, plus its flash")
     local flashes = 0
     for _, piece in ipairs(crit) do
         if piece.points[1][4] == 0 and piece.width >= 34 * 3.2 * 0.5 - 0.01 then flashes = flashes + 1 end
@@ -2899,6 +2899,41 @@ test("every hit plays its school's effect on the enemy's nameplate; a crit doubl
     state.mayhem("brutal", "max")
     state.swing(PLAYER, ENEMY, 120, false)
     equal(#sprays(state), 56, "Total Mayhem: 56 (8x the first 7)")
+    state.dcm.ClearEffects()
+    state.now = state.now + 1
+    state.swing(PLAYER, ENEMY, 300, true)
+    equal(#sprays(state), 100 * 3 + 1, "a Total Mayhem crit: 100 at each spot, and one flash")
+end)
+test("a plate's hit plays mid-body: a normal hit at one of three spots, a crit at all three", function()
+    local state = fixture()
+    state.mayhem("brutal", "low")
+    state.target = ENEMY
+    state.emit("PLAYER_TARGET_CHANGED")
+    onPlate(state, "nameplate1", ENEMY)
+    -- Every roll at its middle, and a pick of three takes the third.
+    state.dcm.random = function(low, high) if low then return high or low end return 0.5 end
+    local function near(a, b) return math.abs(a - b) < 0.01 end
+    state.swing(PLAYER, ENEMY, 300, true)
+    local ys, seen, flash = {}, {}, nil
+    for _, piece in ipairs(sprays(state)) do
+        local y = piece.points[1][5]
+        if not seen[y] then seen[y] = true; ys[#ys + 1] = y end
+        if not flash or piece.width > flash.width then flash = piece end
+    end
+    table.sort(ys)
+    equal(#ys, 3, "three spots")
+    local scale = (ys[3] - ys[2]) / 30
+    equal(near(ys[2] - ys[1], 30 * scale), true, "30 px apart, scaled by distance")
+    equal(near(ys[2], -101 * scale), true, "the middle spot 101 px under the plate: " .. ys[2])
+    equal(near(flash.points[1][5], ys[2]), true, "one flash, on the middle spot")
+    state.dcm.ClearEffects()
+    state.now = state.now + 1
+    state.swing(PLAYER, ENEMY, 120, false)
+    local plain = sprays(state)
+    equal(#plain, 4)
+    for _, piece in ipairs(plain) do
+        equal(near(piece.points[1][5], ys[1]), true, "a normal hit at one spot (here the lowest)")
+    end
 end)
 test("hit effects shrink with the enemy's distance, and start well under its nameplate", function()
     local dcm = fixture().dcm
@@ -2925,7 +2960,7 @@ test("hit effects shrink with the enemy's distance, and start well under its nam
         equal(sizes[index] < sizes[index - 1], true, "smaller farther away: " .. index)
         equal(drops[index] > drops[index - 1], true, "nearer the plate farther away: " .. index)
     end
-    equal(drops[1] <= -76, true, "76 px or more under the plate up close")
+    equal(drops[1] <= -101, true, "101 px or more under the plate up close")
     -- In combat, a unit you cannot attack is never range-checked (the client
     -- blocks it): no distance, so full size, and no error.
     local state = fixture({restrictCombatLog = true})
@@ -3022,7 +3057,7 @@ test("hits and heals on you play over your character; heals are green plus signs
     state.now = state.now + 1
     state.heal(state.env.UnitGUID("party1") or "Player-party", PLAYER, "Heal", 300, true)
     shown = sprays(state)
-    equal(#shown, 9, "a crit heal: doubled, plus a green glow")
+    equal(#shown, 7 + 1, "a crit heal on you, no plate: one spot of Low's 7, plus a green glow")
     for _, piece in ipairs(shown) do
         equal(piece.texture:find("Plus1", 1, true) ~= nil or piece.texture:find("Burst1", 1, true) ~= nil, true,
             piece.texture)
@@ -3061,7 +3096,7 @@ test("Forever: every wound on a nameplate plays, crits double, and the effects g
     equal(sprays(state)[1].points[1][2], state.plateFrames[ENEMY])
     state.now = state.now + 1
     state.emit("UNIT_COMBAT", "nameplate2", "WOUND", "CRITICAL", amount, 16)
-    equal(#sprays(state), 6 + 30 + 1, "a frost crit: six times 2.5, doubled, and its flash")
+    equal(#sprays(state), 6 + 28 * 3 + 1, "a frost crit: Medium's 11 times 2.5 at three spots, and its flash")
     state.emit("NAME_PLATE_UNIT_REMOVED", "nameplate2")
     equal(#sprays(state), 0, "the plate is reused: its effects go")
     -- Hits and heals on you.

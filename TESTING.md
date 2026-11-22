@@ -181,7 +181,9 @@ in, and BugSack on to catch errors.
    nature, holy on your target's plate (on you without a target): flames
    fall through the body, snow drifts and turns, sparks burst, smoke
    rises, holy throws golden sparkles (no ring). The effect starts at
-   the mob's body, well under its nameplate. Distance: hit a mob up
+   the mob's mid-body, well under its nameplate: a plain hit at one of
+   three spots 30 px apart (they change from hit to hit), a crit at all
+   three with one burst on the middle spot. Distance: hit a mob up
    close, then one at 30 yd (a ranged pull or a wand): the far one's
    effect is much smaller, and nearer its plate. Is the spot on the body right, or too high
    or low? Get hit: the same over your character in the middle of the
