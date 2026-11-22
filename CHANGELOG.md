@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.4
+
+### Other changes
+
+- The Intensity slider shows Dyre's Toolkit's gold mark at its default (Low), as Stays on screen does at 100%.
+
 ## 0.3.3
 
 ### Other changes

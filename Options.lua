@@ -300,12 +300,18 @@ local function AddIntensity()
     if type(MinimalSliderWithSteppersMixin) == "table" and type(options.SetLabelFormatter) == "function" then
         options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, IntensityLabel)
     end
-    Settings.CreateSlider(category, setting, options,
+    local intensity = Settings.CreateSlider(category, setting, options,
         "How much your crits show, in your theme: each step is more, bigger, and stays longer. Low (the "
             .. "default): one small effect. Medium, High, and Total Mayhem: more of them, bigger, for "
             .. "longer. To turn every effect off, pick the None theme. With an 18+ theme (Brutal, Fel, "
             .. "Naturalist), it also turns up the game's own blood on hit models (its violence level): Low 3, "
             .. "Medium 4, High and Total Mayhem 5. None, or a cute theme, puts your own level back.")
+    -- The toolkit's gold mark at the default (John: "set notches on the
+    -- sliders default values").
+    if type(DCM.toolkit.AddDefaultTick) == "function" then
+        DCM.toolkit.AddDefaultTick(intensity, {min = 1, max = #DCM.INTENSITIES,
+            default = DCM.INTENSITY_INDEX[DCM.DEFAULT_INTENSITY]})
+    end
     local stay = Proxy(STAY_VARIABLE, Settings.VarType.Number, "Stays on screen", DCM.STAY_DEFAULT,
         function() return DCM.db.stay end,
         function(value) DCM.db.stay = DCM.SanitizeStay(value) end)

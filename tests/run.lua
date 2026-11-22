@@ -236,6 +236,8 @@ local function fixture(options)
         function object:SetParentInitializer(parent, predicate)
             self.parentInitializer, self.predicate = parent, predicate
         end
+        -- Blizzard's row setup, for the toolkit's AddDefaultTick to find.
+        function object:InitFrame() end
         object.modifyPredicates = {}
         function object:AddModifyPredicate(predicate)
             self.modifyPredicates[#self.modifyPredicates + 1] = predicate
@@ -645,7 +647,7 @@ end
 
 test("login prints the banner from the TOC and the ready hint", function()
     local state = fixture()
-    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.3 by Dyre")
+    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.4 by Dyre")
     contains(state.messages[2], "Type /dcm for your records")
     equal(#state.messages, 2, "nothing else at login")
 end)
@@ -872,6 +874,13 @@ test("the settings page: the 18+ box first, the theme, then the intensity and it
     local names = {}
     for value = 1, 4 do names[#names + 1] = intensity.options.formatter(value) end
     equal(table.concat(names, ","), "Low,Medium,High,Total Mayhem", "no Off: None is a theme")
+    -- The toolkit's gold default mark on both sliders.
+    equal(type(intensity.dyreDefault), "table", "the intensity has the default mark")
+    equal(intensity.dyreDefault.min, 1)
+    equal(intensity.dyreDefault.max, 4)
+    equal(intensity.dyreDefault.default, 1, "the mark at Low, the default")
+    equal(type(stay.dyreDefault), "table", "the stay has the default mark")
+    equal(stay.dyreDefault.default, 100)
     intensity.setting:SetValue(4)
     equal(state.db().intensity, "max", "the saved key is unchanged")
     intensity.setting:SetValue(1)
