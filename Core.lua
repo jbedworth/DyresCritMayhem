@@ -113,7 +113,20 @@ function DCM.Title()
     return Metadata("Title") or DEFAULT_TITLE
 end
 
+-- Dyre's Toolkit 2.14.0's "Welcome messages at login" (John, 2026-11-23:
+-- "toggle off our welcome messages unless there is an error/problem").
+-- Without ShowWelcome (an older toolkit, or none), the banner prints as before.
+-- It skips only the banner and the ready line; problems always print.
+local function WelcomeShown()
+    local toolkit = _G.DyresToolkit
+    return not (type(toolkit) == "table" and type(toolkit.ShowWelcome) == "function"
+        and toolkit.ShowWelcome() == false)
+end
+
 local function ReportLoaded(available)
+    if not WelcomeShown() then
+        return
+    end
     local banner = DCM.Title()
     local version, author = Metadata("Version"), Metadata("Author")
     if version then

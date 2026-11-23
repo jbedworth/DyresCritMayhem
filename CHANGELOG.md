@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.6
+
+### Other changes
+
+- The login message follows Dyre's Toolkit's "Welcome messages at login" switch (Toolkit 2.14.0 or later). Errors still show.
+
 ## 0.3.5
 
 ### Other changes

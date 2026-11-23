@@ -519,6 +519,13 @@ local function fixture(options)
         end
         env.DyresToolkitDB.profiles = options.profiles
         state.toolkit = env.DyresToolkit
+        -- options.welcome: "absent" is a toolkit older than 2.14.0 (no
+        -- ShowWelcome); true or false is the player's "Welcome messages at login".
+        if options.welcome == "absent" then
+            state.toolkit.ShowWelcome = nil
+        elseif options.welcome ~= nil then
+            state.toolkit.ShowWelcome = function() return options.welcome end
+        end
     end
     state.dcm = {}
     for _, path in ipairs(RUNTIME_FILES) do
@@ -647,9 +654,25 @@ end
 
 test("login prints the banner from the TOC and the ready hint", function()
     local state = fixture()
-    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.5 by Dyre")
+    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.6 by Dyre")
     contains(state.messages[2], "Type /dcm for your records")
     equal(#state.messages, 2, "nothing else at login")
+end)
+test("the banner follows the toolkit's welcome switch; problems always print", function()
+    for _, welcome in ipairs({"absent", true}) do
+        local state = fixture({welcome = welcome})
+        equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.6 by Dyre", tostring(welcome))
+        equal(#state.messages, 2, tostring(welcome))
+    end
+    local state = fixture({noToolkit = true})
+    equal(state.messages[1], "DCM: Dyre's Crit Mayhem 0.3.6 by Dyre", "no toolkit")
+    contains(state.last(), "needs Dyre's Toolkit 2.0")
+    state = fixture({welcome = false})
+    equal(#state.messages, 0, "welcome off: nothing at login")
+    equal(state.dcm.available, true)
+    state = fixture({welcome = false, globals = {SLASH_OTHER1 = "/DCM"}, slashCmdList = {OTHER = function() end}})
+    equal(#state.messages, 1, "welcome off: only the problem")
+    contains(state.last(), "Another AddOn (OTHER) also uses /dcm")
 end)
 test("the TOC requires the toolkit, nests under it, and loads the files in order", function()
     local state = fixture()
